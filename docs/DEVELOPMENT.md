@@ -9,7 +9,7 @@
 - Go **1.26+**
 - `./script/build.sh` 会跑 `go test ./...`，**不需要**真堡垒机
   （打真堡垒机的那部分由环境变量 gate 住，不设就 skip）
-- ⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.0` ——
+- ⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.1` ——
   **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-mcp-kit)**。
   离线机器上用 `GOPROXY=off`（只要 module cache 里已经有依赖）。
   ⚠️ 本地联调（kit 还没发布到 GitHub 时）用**不入库**的 `go.work`：

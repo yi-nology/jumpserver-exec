@@ -25,7 +25,7 @@ gofmt -l .               # 格式化检查（应无输出）
 go vet ./...             # 静态检查
 ```
 
-⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.0`
+⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.1`
 —— **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-mcp-kit)**，
 不在本仓里。离线机器上用 `GOPROXY=off`（只要 module cache 里已经有依赖）。
 ⚠️ 本地联调（kit 还没发布到 GitHub 时）用**不入库**的 `go.work`：
