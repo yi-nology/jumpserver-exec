@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# GOPRIVATE:github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-exec-kit
+# —— 自家模块系列(guardx 等)与共用底座不走公开代理与 checksum DB,
+# 直接从 GitHub 取。前提与解封条件见 ci.yml 同名注释。
+env:
+  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-exec-kit
+
+jobs:
+  test:
+    name: Test before release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # ⚠️ fetch-depth: 0 —— 发布要拿到完整的 tag 历史（算上一个版本、
+      #   拼变更清单）。浅克隆拿不到，release 会少东西。
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test -v ./...
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          # 本仓用纯 Go 的 sqlite(modernc 内核)⇒ 交叉编译不需要 C 工具链
+          # ⇒ 统一关掉 CGO，六个平台都能在同一个 runner 上编出来。
+          CGO_ENABLED: 0
+        run: |
+          # 带平台后缀：六个平台在 release 里是六个**独立资产**，
+          # 同名会互相覆盖。
+          binary_name="jumpserver-mcp-exec-${GOOS}-${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            binary_name="${binary_name}.exe"
+          fi
+          go build -o "./dist/${binary_name}" ./cmd/jumpserver-mcp-exec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: jumpserver-mcp-exec-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ./dist/*
+
+  publish:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: release
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: ./artifacts
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          find . -type f ! -name checksums.txt | sort | xargs sha256sum > checksums.txt
+          cat checksums.txt
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG="Initial release"
+          else
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          generate_release_notes: true
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Artifacts
+
+            - `checksums.txt` - SHA256 checksums for all artifacts
+
+            ### Server
+            - `jumpserver-mcp-exec-linux-amd64` - Linux x86_64
+            - `jumpserver-mcp-exec-linux-arm64` - Linux ARM64
+            - `jumpserver-mcp-exec-darwin-amd64` - macOS x86_64
+            - `jumpserver-mcp-exec-darwin-arm64` - macOS ARM64 (Apple Silicon)
+            - `jumpserver-mcp-exec-windows-amd64.exe` - Windows x86_64
+            - `jumpserver-mcp-exec-windows-arm64.exe` - Windows ARM64
+
+            ### 接线
+            这是一个 **MCP server**，不是命令行工具 ⇒ 用 MCP 客户端接线
+            （`command` 指向这个二进制、`env` 里给 `JUMPSERVER_URL`、
+            `JUMPSERVER_TOKEN` 与 koko 私钥路径）。
+            ⚠️ **koko 只认 `ssh-rsa`** —— ed25519 会被静默拒绝，
+            而拒绝的样子长得像权限问题。详见
+            [README](https://github.com/yi-nology/jumpserver-mcp-exec#2-五分钟装好)。
+          files: ./artifacts/**/*
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
