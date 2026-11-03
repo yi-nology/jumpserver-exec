@@ -11,6 +11,21 @@
 
 ### 修复
 
+## [0.3.3] - 2026-11-04
+
+### 修复
+
+- ⚠️ **`checksums.txt` 里的路径带目录前缀 ⇒ 校验形同虚设**：
+  实测 `v0.3.2` 的 checksums 里写的是
+  `./jumpserver-mcp-exec-linux-amd64/jumpserver-mcp-exec-linux-amd64`，
+  而**下载页上的资产是扁平的** ⇒ 用户在下载目录跑
+  `sha256sum -c checksums.txt` 会报「文件不存在」。
+  ⇒ 算哈希时读源文件，只把输出里的路径换成 basename。
+
+### 变更
+
+- 版本号 0.3.2 → 0.3.3。
+
 ## [0.3.2] - 2026-11-04
 
 ### 修复
