@@ -3,7 +3,8 @@
 /jumpserver-mcp-exec
 *.test
 *.out
-coverage.*
+coverage.out
+coverage.html
 
 # go.work 只在本机存在：共用底座 jumpserver-mcp-kit 还没发布到 GitHub，
 # 本地靠工作集（go.work）把它接进来。
