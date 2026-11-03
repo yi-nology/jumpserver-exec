@@ -22,7 +22,7 @@ import (
 //
 // ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.3.1` 装出来的二进制
 // 要自己说对版本；说错的话，用户看 `--version` 会以为装错了版本。
-const Version = "0.3.1"
+const Version = "0.3.2"
 
 // Main runs the command line and exits with the command's exit code.
 func dispatch() {

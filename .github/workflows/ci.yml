@@ -45,12 +45,21 @@ jobs:
     #    这里要求它不许跳过：缺了 go.sum 就该红，而不是悄悄放过。
     env:
       JMS_REQUIRE_PUBLISHED: "1"
+      # ⚠️ 版本守卫在 **tag 触发**的构建里才比对：二进制说的版本必须等于
+      #   **它是从哪个 tag 构建出来的**。
+      #   ⇒ 在 main 上（还没打 tag）它跳过 —— 否则「版本号先抬、tag 后打」
+      #   这条正常流程会把自己的 CI 弄红，守卫就会被第一个被它烦到的人关掉。
+      #   ⇒ 在 tag 上它有牙齿：忘了抬版本常量 ⇒ 发版构建当场红。
+      JMS_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
 
     steps:
       - name: Checkout service
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          # ⚠️ fetch-depth: 0 —— 版本守卫要读 tag（git describe --exact-match），
+          #   浅克隆拿不到 tag 对象 ⇒ 守卫会永远跳过 ⇒ 又变成「看着有、其实没跑」。
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
