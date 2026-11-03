@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+# GOPRIVATE:github.com/oagentkit/* —— 自家模块系列(guardx 等)不走公开代理与
+# checksum DB,直接从 GitHub 取:第三方代理不参与自家模块的分发。
+#
+# ⚠️ 前提:这些仓当前是**公开**的,直连走匿名 HTTPS 即可;GOPRIVATE 同时会让 Go
+#    跳过 checksum DB(go.sum 的哈希校验仍然生效)。
+#    若将来 oagentkit 转私有,本 workflow 的 checkout 用了 persist-credentials: false
+#    (不保留 git 凭据),届时必须改成保留凭据,否则直连拉取会失败。
+#
+# ⚠️ 本项目还要加上 **github.com/yi-nology/jumpserver-mcp-kit**（共用底座）：
+#    它还没被公开代理收录 ⇒ 必须直连 GitHub 取。
+#    ⚠️ 底座要有**可解析的版本**才能被 require 解析 ⇒ kit 仓必须已经推上并打好
+#       v0.1.0 的 tag。**先推 kit（带 tag），再推本仓**，否则 go mod download 拉不到它。
+env:
+  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-kit
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # ⚠️ 「每个依赖都被 go.sum 钉住、都已在 module cache 里解包」这条守卫
+    #    在**没有 go.sum 时会跳过**（没有可判的对象）⇒ 跳过 ≠ 通过 ⇒
+    #    这里要求它不许跳过：缺了 go.sum 就该红，而不是悄悄放过。
+    env:
+      JMS_REQUIRE_PUBLISHED: "1"
+
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未按 gofmt 格式化:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          files: coverage.out
+        # ⚠️ 需要仓库侧配好 codecov 才能上传成功;没配时**不要**让这一条把整个 CI 拉红。
+        continue-on-error: true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.15.0
+        # ⚠️ 默认规则集还没在本仓调过 ⇒ 先**报告**不阻断;调好之后去掉这一行。
+        continue-on-error: true
+
+  vuln:
+    name: Govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
+        with:
+          repo-checkout: false
+          go-version-file: go.mod
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        # CGO 与 release/Dockerfile 保持一致(go.mod 用纯 Go sqlite)
+        env:
+          CGO_ENABLED: '0'
+        run: go build -o ./bin/jumpserver-mcp-exec ./cmd/jumpserver-mcp-exec

@@ -1,0 +1,199 @@
+package main
+
+// debug_probe.go is a throwaway harness: it opens a bare koko session, dumps
+// the first paint, then walks the same steps Open() takes, logging progress to
+// stderr so a stall can be located.
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+)
+
+func debugProbe() {
+	keyPath := os.Getenv("HOME") + "/.ssh/id_rsa"
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "read key:", err)
+		return
+	}
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "parse key:", err)
+		return
+	}
+
+	log := func(f string, a ...any) {
+		fmt.Fprintf(os.Stderr, "[%s] %s\n", time.Now().Format("15:04:05"), fmt.Sprintf(f, a...))
+	}
+
+	cc := &ssh.ClientConfig{
+		User:            "ai",
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         20 * time.Second,
+	}
+
+	log("dial 192.0.2.41:2222")
+	client, err := ssh.Dial("tcp", "192.0.2.41:2222", cc)
+	if err != nil {
+		log("dial FAILED: %v", err)
+		return
+	}
+	defer client.Close()
+	log("dial OK")
+
+	sess, err := client.NewSession()
+	if err != nil {
+		log("new session FAILED: %v", err)
+		return
+	}
+	log("session ok")
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,
+		ssh.ECHONL:        1,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
+	}
+	if err := sess.RequestPty("xterm", ptyRows, ptyCols, modes); err != nil {
+		log("RequestPty FAILED: %v", err)
+		return
+	}
+	log("pty ok (%dx%d)", ptyRows, ptyCols)
+
+	stdin, err := sess.StdinPipe()
+	if err != nil {
+		log("StdinPipe FAILED: %v", err)
+		return
+	}
+	stdout, err := sess.StdoutPipe()
+	if err != nil {
+		log("StdoutPipe FAILED: %v", err)
+		return
+	}
+	if err := sess.Shell(); err != nil {
+		log("Shell FAILED: %v", err)
+		return
+	}
+	log("shell started")
+
+	screen := &buffer{}
+	go func() {
+		n, _ := screen.ReadFrom(stdout)
+		log("stdout EOF after %d bytes", n)
+	}()
+	time.Sleep(6 * time.Second)
+	s := stripANSI(screen.String())
+	log("after 6s: %d raw bytes, has 'Ctrl+C'=%v", len(screen.String()),
+		strings.Contains(s, "Ctrl+C"))
+	log("screen tail: %s", tail(s, 600))
+
+	// Walk the search.
+	log("sending Ctrl+U then 'node-071'")
+	io.WriteString(stdin, "\x15")
+	time.Sleep(400 * time.Millisecond)
+	io.WriteString(stdin, "node-071")
+	time.Sleep(4 * time.Second)
+	s = stripANSI(screen.String())
+	log("after search: has '1-1'=%v / '1–1'=%v / noAsset=%v",
+		strings.Contains(s, "1-1"), strings.Contains(s, "1–1"), strings.Contains(s, noAsset))
+	log("screen tail: %s", tail(s, 600))
+
+	log("send Enter #1")
+	io.WriteString(stdin, "\r")
+	time.Sleep(3 * time.Second)
+	s = stripANSI(screen.String())
+	log("after Enter1: prompt=%v", promptRe.MatchString(s))
+	log("screen tail: %s", tail(s, 500))
+
+	log("send Enter #2")
+	io.WriteString(stdin, "\r")
+	time.Sleep(5 * time.Second)
+	s = stripANSI(screen.String())
+	log("after Enter2: prompt=%v", promptRe.MatchString(s))
+	log("screen tail: %s", tail(s, 900))
+
+	// Isolate which part of the wrapper koko chokes on: length, the pipe, or
+	// the trailing rc echo. Run three progressively richer forms.
+	try := func(label, cmd, endMark string) bool {
+		log("--- %s ---", label)
+		io.WriteString(stdin, cmd+"\n")
+		for i := 0; i < 15; i++ {
+			time.Sleep(1 * time.Second)
+			if strings.Contains(screen.String(), endMark) {
+				time.Sleep(500 * time.Millisecond)
+				raw := stripANSI(screen.String())
+				if bi := strings.Index(raw, "TAILSTART"); bi >= 0 {
+					end := bi + 400
+					if end > len(raw) {
+						end = len(raw)
+					}
+					log("RAW >>>%q<<<", raw[bi:end])
+				} else {
+					log("TAILSTART missing; tail=%q", tail(raw, 500))
+				}
+				return true
+			}
+		}
+		log("timeout waiting for %s", endMark)
+		return false
+	}
+
+	// Hypothesis: the content is produced but scrolls out of the pane, so the
+	// final frame only shows the tail. Push it back into view with padding
+	// newlines before and after.
+	pad := strings.Repeat("\n", 30)
+	try("D padded with newlines",
+		`echo`+pad+`echo TAILSTART; hostname; whoami; echo DDD_DONE`+pad,
+		"DDD_DONE")
+
+	// Hypothesis 2: clear first so the result starts at the top of the pane.
+	try("E clear then run",
+		`clear; echo TAILSTART; hostname; whoami; echo EEE_DONE`,
+		"EEE_DONE")
+
+	// Reproduce exactly what Exec does, and report the offsets that drive it.
+	before := len(screen.String())
+	log("before=%d", before)
+	wrapped := "{ echo " + markBegin + "; hostname; whoami; echo \"" + markRC + "\"$?; } 2>&1 | cat -n; echo " + markEnd
+	log("sending wrapped (%d bytes)", len(wrapped))
+	io.WriteString(stdin, wrapped+"\n")
+
+	var raw string
+	for i := 0; i < 20; i++ {
+		time.Sleep(1 * time.Second)
+		cur := screen.String()
+		if strings.Contains(cur, markEnd) {
+			time.Sleep(800 * time.Millisecond)
+			raw = stripANSI(cur)
+			break
+		}
+	}
+	if raw == "" {
+		log("never saw end marker; screen len=%d", len(screen.String()))
+		return
+	}
+
+	body := stripANSI(screen.String()[before:])
+	log("after: total=%d body=%d", len(raw), len(body))
+	log("  body lastIndex(begin)=%d lastIndex(end)=%d lastIndex(rc)=%d",
+		strings.LastIndex(body, markBegin),
+		strings.LastIndex(body, markEnd),
+		strings.LastIndex(body, markRC))
+
+	if bi := strings.LastIndex(body, markBegin); bi >= 0 {
+		end := bi + 500
+		if end > len(body) {
+			end = len(body)
+		}
+		log("BODY FROM LAST BEGIN >>>%q<<<", body[bi:end])
+	}
+
+	out, code, err := parseOutput(stripANSI(screen.String()[before:]))
+	log("final parse: exit=%d err=%v output=%q", code, err, out)
+}

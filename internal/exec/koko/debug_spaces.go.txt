@@ -1,0 +1,73 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+)
+
+// dumpSpaces checks where spaces go: in the shell, in the PTY, or in tmux.
+func dumpSpaces() {
+	key, _ := os.ReadFile(os.Getenv("HOME") + "/.ssh/id_rsa")
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "key:", err)
+		return
+	}
+	log := func(f string, a ...any) {
+		fmt.Fprintf(os.Stderr, "[%s] %s\n", time.Now().Format("15:04:05"), fmt.Sprintf(f, a...))
+	}
+
+	client, err := ssh.Dial("tcp", "192.0.2.41:2222", &ssh.ClientConfig{
+		User: "ai", Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 20 * time.Second,
+	})
+	if err != nil {
+		log("dial: %v", err)
+		return
+	}
+	defer client.Close()
+	sess, _ := client.NewSession()
+	modes := ssh.TerminalModes{ssh.ECHO: 1, ssh.ECHONL: 1,
+		ssh.TTY_OP_ISPEED: 14400, ssh.TTY_OP_OSPEED: 14400}
+	_ = sess.RequestPty("xterm", ptyRows, ptyCols, modes)
+	stdin, _ := sess.StdinPipe()
+	stdout, _ := sess.StdoutPipe()
+	_ = sess.Shell()
+
+	screen := &buffer{}
+	go screen.ReadFrom(stdout)
+	time.Sleep(7 * time.Second)
+
+	_, _ = stdin.Write([]byte("\x15"))
+	time.Sleep(400 * time.Millisecond)
+	_, _ = stdin.Write([]byte("node-071"))
+	time.Sleep(4 * time.Second)
+	_, _ = stdin.Write([]byte("\r"))
+	time.Sleep(3 * time.Second)
+	_, _ = stdin.Write([]byte("\r"))
+	time.Sleep(6 * time.Second)
+
+	before := len(screen.String())
+	// A payload with obvious space markers in several positions.
+	cmd := `{ echo SPACEMARK; echo "A B C"; echo "  leading and trailing  "; echo "tab	here"; } 2>&1 | cat -n | tr '\t' '@'; echo DONE_MARK` + "\n"
+	_, _ = stdin.Write([]byte(cmd))
+	time.Sleep(6 * time.Second)
+
+	body := screen.String()[before:]
+	clean := stripANSI(body)
+	log("--- raw body tail (spaces shown as ~) ---")
+	tailPart := clean
+	if len(tailPart) > 1200 {
+		tailPart = tailPart[len(tailPart)-1200:]
+	}
+	log("%s", strings.ReplaceAll(strings.ReplaceAll(tailPart, " ", "~"), "\t", "<TAB>"))
+
+	log("--- does the raw stream contain 'A B C'? ---")
+	log("raw has %q : %v", "A B C", strings.Contains(body, "A B C"))
+	log("raw has %q : %v", "A~B~C", strings.Contains(body, "A~B~C"))
+	log("stripped has 'A B C': %v", strings.Contains(clean, "A B C"))
+}
