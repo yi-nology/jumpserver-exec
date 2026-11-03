@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main, master]
+    # ⚠️ **tag 也要跑 CI**：打出去的 tag 必须**能编译**。
+    #   踩过的坑：v0.3.0 是在 CI 还红的时候打的 ⇒ 那个 tag 缺一个源码文件
+    #   （.gitignore 的 `coverage.*` 把同名源码吞了）⇒ `go install ...@v0.3.0`
+    #   直接编译失败，而**没有一个人收到通知**。
+    #   ⇒ tag 一推就跑一遍 CI ⇒ tag 坏了会当场红。
+    tags: ['v*']
   pull_request:
     branches: [main, master]
 

@@ -98,7 +98,13 @@ def launches(path, env):
         except Exception:
             return False, "不应答 initialize（进程还活着）"
         err = (p.stderr.read() or "").strip().splitlines()
-        return False, ("它退了：" + err[0]) if err else "它退了，但没有输出"
+        if not err:
+            return False, "它退了，但没有输出"
+        text = "\n".join(err)
+        if "panic:" in text or "goroutine " in text:
+            return False, "它崩了：" + err[0]
+        # 它自己说明了为什么不做 ⇒ 二进制起得来，缺的是配置。
+        return True, "它按设计拒绝服务（缺配置）：" + err[0]
     except Exception as e:
         return False, f"起不来：{e}"
     finally:
@@ -152,7 +158,8 @@ def main():
     if rev:
         tag = f"  [{rev[:12]}{' +DIRTY' if mod == 'true' else ''}]"
     print(f"    {'OK  ' if good else 'FAIL'} {dst}   (from {src}){tag}")
-    if not good:
+    if why:
+        # ⚠️ 「它按设计拒绝服务」也要说出来：OK 不等于「它应答了 initialize」。
         print(f"         {why}")
 
     if mod == "true":
