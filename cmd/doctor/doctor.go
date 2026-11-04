@@ -340,7 +340,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			"%d connection(s) open; an idle one is closed after %s. They do NOT show up in "+
 				"the bastion's session list (it records the per-command exec session, which ends with "+
 				"the command), but each one holds an sshd session process on its asset",
-			cfg.Koko.Pool.Size(), koko.PoolTTL))
+			cfg.Koko.Pool.Size(), cfg.Koko.Pool.TTL()))
 	}
 
 	// The trail: where the gate's own record of this machine is kept. It is

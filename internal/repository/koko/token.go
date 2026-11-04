@@ -466,7 +466,7 @@ func mintConnectionToken(ctx context.Context, cfg Config, assetID, accountID str
 		return connectionToken{}, err
 	}
 
-	if dc := delegationConfig(cfg); dc != nil && cfg.API.MayPresent(ctx, jmsapi.CapDelegation) {
+	if dc := cfg.Delegation; dc != nil && cfg.API.MayPresent(ctx, jmsapi.CapDelegation) {
 		// The identity has to be resolved before the credential can be
 		// signed: a delegation config with a secret but no user id cannot
 		// be used, and falling back to the API token would quietly widen

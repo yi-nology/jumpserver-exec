@@ -1011,18 +1011,9 @@ func resultSignature(s string, m marks, minEpoch int) (rows int, code int, finge
 // that included it, so the first occurrence wins and the rest are repaint noise.
 // Output that genuinely repeats still gets distinct numbers, so nothing
 // legitimate is dropped.
-// scanNumbered pulls the numbered payload out of a screen capture, plus the
-// command's exit code.
 //
-// It does not assume the payload sits in one contiguous span between the
-// markers. koko's tmux repaints the whole pane on every update, so a capture is
-// hundreds of KB of interleaved frames: the begin marker, its own row, the
-// result and the end marker routinely land in different repaints, with empty
-// border rows between them. Every painted row is therefore scanned, the ones
-// carrying a `cat -n` number are collected, and the numbering reassembles them:
-// line N appears once per repaint that included it, so the first occurrence wins
-// and the rest are repaint noise. Output that genuinely repeats still gets
-// distinct numbers, so nothing legitimate is dropped.
+// scanNumbered below is the scanner that does that work and also recovers the
+// command's exit code; parseOutput joins its lines.
 func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 	type row struct {
 		n   int // session-unique sort key (epoch + line index)
@@ -1160,6 +1151,9 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 	return out, code, truncated
 }
 
+// parseOutput joins scanNumbered's rows into the command's output text.
+// The why — repaint noise, numbered rows, gap detection — is told once, on
+// scanNumbered, which is where that work happens.
 func parseOutput(s string, m marks, minEpoch int) (string, int, bool, error) {
 	if !strings.Contains(s, m.end) {
 		return "", -1, false, fmt.Errorf("no end marker in output")

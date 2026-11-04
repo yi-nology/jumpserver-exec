@@ -227,23 +227,12 @@ func Open(ctx context.Context, cfg Config, asset, account string, timeout time.D
 		// ⚠️ That includes a CONFIGURATION mistake (an unknown backend
 		// name): the fact is still true, and saying it is deliberate —
 		// a sweep that failed this way sent nothing and is safe to run
-		// again.
-		return nil, notOpened(err)
+		// again. And "no, it never left" is what lets an operator tell
+		// "this host never even started" from "this host may still be
+		// running it".
+		return nil, notSent(err)
 	}
 	return b, nil
-}
-
-// notOpened marks a failure to open a session.
-//
-// A session is what carries the commands, so a session that never opened
-// means the command never left this process — the answer to "did it reach
-// the machine?" is "no", and saying so is what lets an operator tell
-// "this host never even started" from "this host may still be running it".
-func notOpened(err error) error {
-	if err == nil {
-		return nil
-	}
-	return notSent(err)
 }
 
 // openAuto opens a session, trying the backends in the order the memory
@@ -411,13 +400,4 @@ func (m *mergedBuffer) String() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.buf.String()
-}
-
-// delegationConfig returns the delegation settings, or nil when there are
-// none.
-func delegationConfig(cfg Config) *jmsapi.DelegationConfig {
-	if cfg.Delegation == nil {
-		return nil
-	}
-	return cfg.Delegation
 }

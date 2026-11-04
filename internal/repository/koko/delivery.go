@@ -39,6 +39,9 @@ func (e *deliveryError) Unwrap() error { return e.cause }
 // The wording is kept as it was: the sentence an operator reads to decide
 // whether running it again is safe.
 func notSent(err error) error {
+	if err == nil {
+		return nil
+	}
 	return &deliveryError{
 		text:     err.Error(),
 		delivery: jms.Delivery_not_sent,

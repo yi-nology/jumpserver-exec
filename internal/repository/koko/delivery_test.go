@@ -80,14 +80,14 @@ func TestMarkingAFailureKeepsIt(t *testing.T) {
 // a guess: the session is what carries the commands.
 func TestASessionThatNeverOpenedNeverSentAnything(t *testing.T) {
 	inner := errors.New("no such asset: \"no-such-host-xyz\"")
-	marked := notOpened(inner)
+	marked := notSent(inner)
 	if got := reg.DeliveryOf(marked); got != jms.Delivery_not_sent {
 		t.Errorf("the delivery state is %v, want not_sent", got)
 	}
 	if !errors.Is(marked, inner) {
 		t.Error("the marked error lost the original in its chain")
 	}
-	if notOpened(nil) != nil {
+	if notSent(nil) != nil {
 		t.Error("marking no error produced an error")
 	}
 }
