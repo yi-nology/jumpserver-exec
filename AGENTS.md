@@ -380,6 +380,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
+| **凭据** | 明文凭据不许进仓（底座 `pkg/arch/credential.go` + 本仓 `internal/arch/execution_test.go` 的 `TestThePlaintextCredentialsAreNotInTheRepository`）⇒ 守卫体一份，两个面各接一个入口 |
 | 自检 | `./bin/jumpserver-mcp-exec --doctor` 退出码 0（查密钥类型 / 端口 / 真实 koko 登录） |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
 

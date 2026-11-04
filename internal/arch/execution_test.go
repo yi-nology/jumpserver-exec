@@ -119,6 +119,15 @@ func TestTheBinariesAreTheOutermostLayer(t *testing.T) {
 	arch.CheckBinariesAreOutermost(t, tree.Root, tree.ModulePath)
 }
 
+// TestThePlaintextCredentialsAreNotInTheRepository 让凭据不进仓。
+//
+// ⚠️ 执行面自己**不接**任何凭据参数（它拿的是会话里已有的东西）⇒ 这里
+// 守的不是「参数要脱敏」，而是「仓里不许躺着一个能用的凭据」：本仓的
+// 历史里就躺过一枚堡垒机管理员的令牌，而它是被人手工翻历史才发现的。
+func TestThePlaintextCredentialsAreNotInTheRepository(t *testing.T) {
+	arch.CheckNoPlaintextCredentials(t, executionRoot(t))
+}
+
 // TestTheEntryLayerIsOneBinaryAtTheRoot 让「一个仓一个二进制」这件事是
 // 机械地成立的。
 //

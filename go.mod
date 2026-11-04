@@ -12,7 +12,7 @@ module github.com/yi-nology/jumpserver-mcp-exec
 go 1.26.0
 
 require (
-	github.com/yi-nology/jumpserver-mcp-kit v0.1.5
+	github.com/yi-nology/jumpserver-mcp-kit v0.1.6
 
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
