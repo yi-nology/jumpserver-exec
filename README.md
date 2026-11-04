@@ -73,10 +73,11 @@ chmod +x jumpserver-exec-linux-amd64
 ⚠️ `JMS_BASTION_HOST` 填堡垒机主机名（koko 的 2222 端口）。
 ⚠️ 私钥的 passphrase 别放进 env —— 走 `ssh-agent`，或给一个只有你能读的密钥文件。
 
-### 2.3 接线（HTTP 面，可选）
+### 2.3 接线（HTTP / RPC 面，可选）
 
-同一个工具目录还有第二个面：**REST + MCP over streamable HTTP**。默认关着，
-配两个环境变量就开：
+同一个工具目录有第二个和第三个面：**REST + MCP over streamable HTTP**，以及
+**kitex RPC**（thrift；给其他服务同步调用工具用）。默认都关着，各配两个环境
+变量就开：
 
 ```json
 "env": {
@@ -99,9 +100,11 @@ chmod +x jumpserver-exec-linux-amd64
 `is_error`**（请求没错，结果是拒绝）；请求本身坏才是 400，没有这个工具才是 404。
 契约文档在 [`swagger/openapi.json`](swagger/openapi.json)（生成物，与工具同源）。
 
-只当服务部署时用 `jumpserver-exec serve http`（只开 HTTP 面，长跑到信号为止）；
-默认的 `serve` 是 stdio，配了 `JMS_HTTP_ADDR` 会**顺带**开 HTTP —— 一个进程、
-同一道门禁、同一份留痕。
+- **只当服务部署时**用 `jumpserver-exec serve http`（只开 HTTP 面，长跑到信号为止）；
+- **给其他服务同步调用工具时**用 `serve rpc`（只开 kitex 面）或 `serve all`
+  （HTTP+RPC 常驻；两者都没配拒绝启动；不含 stdio）；
+- 默认的 `serve` 是 stdio，配了 `JMS_HTTP_ADDR` / `JMS_RPC_ADDR` 会**顺带**开
+  对应的面 —— 一个进程、同一道门禁、同一份留痕。
 
 ### 2.4 自检
 
@@ -153,6 +156,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | **脱敏** | 参数、错误、拒绝理由里的凭据按**同一份词表**遮蔽，两个出口（答复 / 留痕）逐字节一致 | `pkg/redact` |
 | **只读模式** | `JMS_READ_ONLY=true` ⇒ 一切会改东西的工具直接拒绝 | 管理面与执行面都支持 |
 | **HTTP 面** | REST 与 MCP over HTTP **共用同一个注册表** ⇒ 同一道门禁、同一套确认、同一份留痕；除 `/api/v1/health` 外全部要 Bearer 令牌（常量时间比较），没有「不开认证」模式 | `pkg/httpapi`（底座） |
+| **RPC 面** | kitex/thrift 第三张脸，同一注册表同一扇门：拒绝是 is_error **答案**、token 错是**传输错误**；无匿名（目录也认证） | `pkg/rpcapi` + `pkg/faces`（底座） |
 | **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试 | `biz/handler` |
 
 > 上面三个 `pkg/*` 现在住在
@@ -181,7 +185,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 ├── main.go / init.go / server.go / workers.go / shutdown.go
 │                                ← 入口层（**仓根**的 package main）：serve / doctor / tools / version
 ├── cmd/                        ← 子命令（入口层 import 的**普通包**，不是二进制）
-│   ├── serve/                  ← 跑服务：stdio MCP（默认）；`serve http` 只开 HTTP 面
+│   ├── serve/                  ← 跑服务：stdio MCP（默认）；http/rpc/all 三种子命令选面
 │   ├── doctor/                 ← 自检：koko 接线
 │   └── tools/                  ← 工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 ├── biz/                        ← 业务

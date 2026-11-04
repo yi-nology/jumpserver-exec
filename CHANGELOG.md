@@ -11,6 +11,22 @@
 
 ### 修复
 
+## [0.8.0] - 2026-11-05
+
+### 新增
+
+- **kitex RPC 面（第三张脸）**：其他服务可经 thrift 同步调用本面的工具——
+  `JMS_RPC_ADDR`（kitex 监听地址）+ `JMS_RPC_TOKEN`（逐调用凭据；ADDR 配了
+  TOKEN 缺 ⇒ 启动即拒，与 HTTP 面同一纪律：没有「不开认证」模式）。调用语义与
+  stdio/REST 逐字同构：同一道门禁、同一套确认、同一份留痕（caller=`rpc`），
+  拒绝与失败是 is_error **答案**不是传输错误。契约在底座（kit 的
+  `idl/jmsrpc` + `kitex_gen/jmsrpc`），生命周期在底座 `pkg/faces`。
+- **启动模型**（`serve` 子命令）：`serve`（无参）= stdio MCP + 配置了地址的面
+  ride-along；`serve http` = 只 HTTP；**`serve rpc` = 只 kitex**（新）；
+  **`serve all` = HTTP+RPC 常驻**（新；两者都没配拒绝启动；不含 stdio——常驻
+  进程的管道那头没人）。常驻模式组合在 `oekit/bootstrap` 上（信号、逐资源
+  关闭预算）。
+
 ## [0.7.0] - 2026-11-04
 
 ### 变更

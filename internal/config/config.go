@@ -59,6 +59,13 @@ type Config struct {
 	// refused at start-up. A surface that answers tool calls to whoever
 	// can reach the port is not a surface this server will serve.
 	HTTPToken string
+	// RPCAddr is where the kitex face listens (the RPC face: other
+	// services calling tools synchronously over thrift). Empty means no
+	// RPC face.
+	RPCAddr string
+	// RPCToken is what every RPC call must present — no auth-off, same
+	// discipline as the HTTP face.
+	RPCToken string
 }
 
 // APIConfig is the REST endpoint of the bastion.
@@ -194,6 +201,12 @@ type settings struct {
 	HTTPAddr  string `yaml:"http_addr" env:"JMS_HTTP_ADDR"`
 	HTTPToken string `yaml:"http_token" env:"JMS_HTTP_TOKEN"`
 
+	// The kitex RPC face: where it listens and the per-call token it
+	// demands. Both empty means no RPC face; one without the other is
+	// refused at start-up (same discipline as the HTTP face).
+	RPCAddr  string `yaml:"rpc_addr" env:"JMS_RPC_ADDR"`
+	RPCToken string `yaml:"rpc_token" env:"JMS_RPC_TOKEN"`
+
 	// The Chat AI delegation credential's identity. The secret itself is
 	// NOT an env-driven field here: it is read from JMS_DELEGATION_SECRET
 	// or from the key file, because it is a secret and not a setting.
@@ -234,6 +247,8 @@ func Load() (Config, error) {
 		},
 		HTTPAddr:  strings.TrimSpace(s.HTTPAddr),
 		HTTPToken: strings.TrimSpace(s.HTTPToken),
+		RPCAddr:   strings.TrimSpace(s.RPCAddr),
+		RPCToken:  strings.TrimSpace(s.RPCToken),
 	}
 	// ⚠️ No "auth off": the HTTP surface answers tool calls on the
 	// operator's machines, so it needs a bearer token.
@@ -298,9 +313,13 @@ func Load() (Config, error) {
 	cfg.Koko.Delegation = delegationOf(cfg, s)
 	cfg.Koko.Memory = koko.NewBackendMemory(s.BackendMemoryTTL)
 	cfg.Koko.Pool = koko.NewPool(cfg.Koko, s.PoolTTL)
+
+	if cfg.RPCAddr != "" && cfg.RPCToken == "" {
+		return Config{}, fmt.Errorf("JMS_RPC_ADDR is set but JMS_RPC_TOKEN is not: the RPC face answers " +
+			"tool calls to whoever can reach the port, and there is no auth-off mode")
+	}
 	return cfg, nil
 }
-
 // delegationOf attaches the delegation credential, when there is one.
 //
 // It is a separate function because the ORDER matters: the pool copies the

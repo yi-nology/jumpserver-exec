@@ -32,7 +32,7 @@
 main.go / init.go / server.go / workers.go / shutdown.go
                              # 入口层（**仓根**的 package main）：serve / doctor / tools / version
 cmd/                        # 子命令（入口层 import 的**普通包**，不是二进制）
-├── serve/                  #   跑服务：stdio MCP（默认）；`serve http` 只开 HTTP 面
+├── serve/                  #   跑服务：stdio MCP（默认）；`serve http` / `serve rpc` / `serve all` 选面
 ├── doctor/                 #   自检：koko 接线
 └── tools/                  #   工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 biz/
@@ -43,6 +43,7 @@ internal/
 ├── config/                 # 配置（环境变量 → 结构体）
 ├── repository/koko/        # 数据访问层：koko TUI 协议 / 连接令牌 / 连接池 / 文件传输
 ├── service/policy/         # 工具目录的**风险侧**：每个工具改不改机器、要不要确认
+│   │                       # （RPC 面与 REST/stdio 同用这一份 policy 表与注册表）
 ├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
 ├── middleware/             # （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 └── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
