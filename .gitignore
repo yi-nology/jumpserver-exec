@@ -1,12 +1,12 @@
 # 构建产物（script/build.sh 的产物落在 ./bin/）
 /bin/
-/jumpserver-mcp-exec
+/jumpserver-exec
 *.test
 *.out
 coverage.out
 coverage.html
 
-# go.work 只在本机存在：共用底座 jumpserver-mcp-kit 还没发布到 GitHub，
+# go.work 只在本机存在：共用底座 jumpserver-kit 还没发布到 GitHub，
 # 本地靠工作集（go.work）把它接进来。
 # ⚠️ 它**不入库**：入库会让 go.mod 与某台机器的目录布局绑定。
 go.work

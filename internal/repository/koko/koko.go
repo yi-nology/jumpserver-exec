@@ -43,7 +43,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // settleGrace is how long to wait after the end marker first appears before

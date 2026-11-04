@@ -8,12 +8,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/handler"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-exec/biz/handler"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // The catalogue and the registration must agree: a tool that is registered

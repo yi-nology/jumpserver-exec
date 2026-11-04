@@ -1,10 +1,10 @@
 package arch_test
 
-// 执行面（jumpserver-mcp-exec）自己的架构守卫薄壳。
+// 执行面（jumpserver-exec）自己的架构守卫薄壳。
 //
 // ⚠️ 这里只有**判据**：本仓是哪个仓、它的目录长什么样、它的契约词汇叫什么、
 // 它的凭据参数有哪些、它不许有什么。守卫的**体**在共用底座
-// jumpserver-mcp-kit 的 pkg/arch 里（两个服务仓的守卫体也在那儿）——
+// jumpserver-kit 的 pkg/arch 里（两个服务仓的守卫体也在那儿）——
 // 抄三份必然漂，而漂的那份决定守卫认不认得出破契约。
 //
 // ⚠️ 与拆分前的单仓相比，判据的形状变了三处：
@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/arch"
+	"github.com/yi-nology/jumpserver-kit/pkg/arch"
 )
 
 // 本仓的判据。
@@ -221,7 +221,7 @@ func TestTheDependenciesArePinned(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "go.sum")); err != nil {
 		msg := "this repository has no go.sum yet: its dependencies resolve through the " +
 			"local workspace (go.work, not committed) while the shared base " +
-			"(jumpserver-mcp-kit) is still unpublished, so there is nothing pinned to " +
+			"(jumpserver-kit) is still unpublished, so there is nothing pinned to " +
 			"check yet. Once the base is published and this repository gains a go.sum, " +
 			"this guard starts running by itself."
 		if os.Getenv("JMS_REQUIRE_PUBLISHED") == "1" {

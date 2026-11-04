@@ -267,12 +267,12 @@ jms_command_guard {"command":"rm -rf /data","asset":"192.0.2.71","user":"ai"}
 
 门禁是在**本机**判的。危险命令没带 `confirm=true` 就不会执行，而它**根本没到堡垒机** ——
 所以堡垒机的会话列表、审计、`jms_command_audit` 里**什么都没有**。
-本机每个进程留一份痕（`~/.local/state/jumpserver-mcp/audit/audit-*.jsonl`），要查就用：
+本机每个进程留一份痕（`~/.local/state/jumpserver-mgmt/audit/audit-*.jsonl`），要查就用：
 
 ```bash
 jmsx_audit_query {"refused":true,"since":"2026-10-28"}
-# → {"trail_dir":"/Users/…/.local/state/jumpserver-mcp/audit",
-#    "entries":[{"ts":"2026-10-28T09:12:03+08:00","service":"jumpserver-mcp-exec","tool":"jmsx_exec",
+# → {"trail_dir":"/Users/…/.local/state/jumpserver-mgmt/audit",
+#    "entries":[{"ts":"2026-10-28T09:12:03+08:00","service":"jumpserver-exec","tool":"jmsx_exec",
 #                "args":"{\"asset\":\"node-071\",\"command\":\"rm -rf /var/lib/x\"}",
 #                "allowed":false,
 #                "refused":"classified DANGEROUS; re-call with confirm=true to execute",

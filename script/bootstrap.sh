@@ -16,7 +16,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-NAME="jumpserver-mcp-exec"
+NAME="jumpserver-exec"
 
 # 本仓刚编出来的那一份优先 —— 它就是「我现在这份源码」。
 if [ -x "$ROOT/bin/$NAME" ]; then

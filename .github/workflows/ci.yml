@@ -23,12 +23,12 @@ permissions:
 #    若将来 oagentkit 转私有,本 workflow 的 checkout 用了 persist-credentials: false
 #    (不保留 git 凭据),届时必须改成保留凭据,否则直连拉取会失败。
 #
-# ⚠️ 本项目还要加上 **github.com/yi-nology/jumpserver-mcp-kit**（共用底座）：
+# ⚠️ 本项目还要加上 **github.com/yi-nology/jumpserver-kit**（共用底座）：
 #    它还没被公开代理收录 ⇒ 必须直连 GitHub 取。
 #    ⚠️ 底座要有**可解析的版本**才能被 require 解析 ⇒ kit 仓必须已经推上并打好
 #       v0.1.0 的 tag。**先推 kit（带 tag），再推本仓**，否则 go mod download 拉不到它。
 env:
-  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-kit
+  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-kit
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -154,4 +154,4 @@ jobs:
         # CGO 与 release/Dockerfile 保持一致(go.mod 用纯 Go sqlite)
         env:
           CGO_ENABLED: '0'
-        run: go build -o ./bin/jumpserver-mcp-exec .
+        run: go build -o ./bin/jumpserver-exec .

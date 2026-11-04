@@ -3,7 +3,7 @@ package handler
 import (
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // The tool layer must not speak HTTP.

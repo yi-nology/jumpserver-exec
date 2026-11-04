@@ -20,8 +20,8 @@
 package policy
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // Table is the tool catalogue's risk side.

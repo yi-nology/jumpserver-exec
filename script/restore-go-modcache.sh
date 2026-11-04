@@ -26,7 +26,7 @@
 # ⚠️ 下面的 MODULES 列表必须与 go.mod 的 require **逐版本一致**：只在一个
 # 里出现而不另一个里出现的模块，要么是恢复不了，要么是用不上。
 #
-# 本仓是**应用**（不是库）：依赖列表 = 共用底座 jumpserver-mcp-kit
+# 本仓是**应用**（不是库）：依赖列表 = 共用底座 jumpserver-kit
 # + 本仓直接用到的第三方库。kit 在它发布之前由本地工作集（go.work）提供，
 # 本脚本会认出它并跳过（见 in_workspace）。
 set -uo pipefail
@@ -62,12 +62,12 @@ MODULES=(
   "golang.org/x/sync@v0.22.0"
   "golang.org/x/sys@v0.49.0"
   "mvdan.cc/sh/v3@v3.14.1"
-  "github.com/yi-nology/jumpserver-mcp-kit@v0.1.9"
+  "github.com/yi-nology/jumpserver-kit@v0.2.0"
 )
 
 # in_workspace 判断某个模块是不是由**本地工作集**（go.work）提供的。
 #
-# ⚠️ 为什么要有这一步：共用底座 jumpserver-mcp-kit 在它发布之前，本地是用
+# ⚠️ 为什么要有这一步：共用底座 jumpserver-kit 在它发布之前，本地是用
 # go.work 里的 use 指向源码目录的 —— 那份源码**不在** module cache 里，
 # 也不在代理上（代理上还没有这个版本）。⇒ 它不该被「恢复」：强行去取只会
 # 拿到一个 404，然后把这个脚本的结论染成「失败」。

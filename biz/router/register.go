@@ -6,10 +6,10 @@
 package router
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/handler"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-exec/biz/handler"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // Register puts every tool of the execution plane on the server.

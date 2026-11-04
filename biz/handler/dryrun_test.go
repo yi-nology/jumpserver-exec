@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/service/policy"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // A dry run is the cheap question: what is this command classified as, and

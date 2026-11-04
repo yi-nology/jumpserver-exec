@@ -19,11 +19,11 @@ import subprocess
 import sys
 import time
 
-BIN_NAME = "jumpserver-mcp-exec"
+BIN_NAME = "jumpserver-exec"
 # MCP 配置里那个 server 的名字。
 # ⚠️ 可用 JMS_MCP_SERVER 覆盖：配置里的名字是**部署的事**，仓里不该钉死
 # （部署可能把两个服务配成别的名字）。
-SERVER_NAME = os.environ.get("JMS_MCP_SERVER", "jumpserver-mcp-exec")
+SERVER_NAME = os.environ.get("JMS_MCP_SERVER", "jumpserver-exec")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -103,7 +103,7 @@ def main():
     # 兜底目录：放**新路径**上的那份，不是覆盖出来的。
     fallback_root = os.path.expanduser(
         os.environ.get("JMS_RUNTIME_ROOT",
-                       os.path.join("~", ".local", "jumpserver-mcp-exec-runtime")))
+                       os.path.join("~", ".local", "jumpserver-exec-runtime")))
     fallback_dir = os.path.join(fallback_root, stamp)
     moved = []
 

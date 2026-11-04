@@ -19,10 +19,10 @@ import (
 
 	"github.com/oekit/core/config"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/fspath"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/fspath"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // Config is the effective configuration of the execution plane.
@@ -124,7 +124,7 @@ type settings struct {
 	AuditMode string `yaml:"audit_mode" env:"JMS_AUDIT" default:"file" options:"file,off"`
 
 	// AuditDir is where the trail files are written.
-	AuditDir string `yaml:"audit_dir" env:"JMS_AUDIT_DIR" default:"~/.local/state/jumpserver-mcp/audit"`
+	AuditDir string `yaml:"audit_dir" env:"JMS_AUDIT_DIR" default:"~/.local/state/jumpserver-mgmt/audit"`
 	// AuditRetentionDays is how many days of trail files are kept.
 	//
 	// ⚠️ The trail is one file per PROCESS, so the directory grows with

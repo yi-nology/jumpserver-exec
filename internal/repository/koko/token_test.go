@@ -26,7 +26,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // fakeBastion answers the connection-token endpoint and records what it was

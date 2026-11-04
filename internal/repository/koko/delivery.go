@@ -15,7 +15,7 @@ package koko
 // and the trail can answer "did it get there?" without parsing prose.
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
 // deliveryError is an error that knows how far the action got.

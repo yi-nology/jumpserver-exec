@@ -8,11 +8,11 @@ on:
 permissions:
   contents: read
 
-# GOPRIVATE:github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-exec-kit
+# GOPRIVATE:github.com/oagentkit/*,github.com/yi-nology/jumpserver-exec-kit
 # —— 自家模块系列(guardx 等)与共用底座不走公开代理与 checksum DB,
 # 直接从 GitHub 取。前提与解封条件见 ci.yml 同名注释。
 env:
-  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-mcp-exec-kit
+  GOPRIVATE: github.com/oagentkit/*,github.com/yi-nology/jumpserver-exec-kit
 
 jobs:
   test:
@@ -80,7 +80,7 @@ jobs:
         run: |
           # 带平台后缀：六个平台在 release 里是六个**独立资产**，
           # 同名会互相覆盖。
-          binary_name="jumpserver-mcp-exec-${GOOS}-${GOARCH}"
+          binary_name="jumpserver-exec-${GOOS}-${GOARCH}"
           if [ "$GOOS" = "windows" ]; then
             binary_name="${binary_name}.exe"
           fi
@@ -89,7 +89,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: jumpserver-mcp-exec-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: jumpserver-exec-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ./dist/*
 
   publish:
@@ -113,11 +113,11 @@ jobs:
 
       - name: Generate checksums
         run: |
-          # ⚠️ **checksums 里的路径必须是扁平的**（`jumpserver-mcp-exec-linux-amd64`，
+          # ⚠️ **checksums 里的路径必须是扁平的**（`jumpserver-exec-linux-amd64`，
           #   不带目录前缀）。
           #   actions/download-artifact 把每个 artifact 解到自己的子目录里
           #   ⇒ 直接 `find . | xargs sha256sum` 出来的是
-          #   `./jumpserver-mcp-exec-linux-amd64/jumpserver-mcp-exec-linux-amd64`
+          #   `./jumpserver-exec-linux-amd64/jumpserver-exec-linux-amd64`
           #   ⇒ 而**下载页上的资产是扁平的** ⇒ 用户 `sha256sum -c checksums.txt`
           #   会报「文件不存在」⇒ 校验这一步形同虚设（用户要么忽略它，
           #   要么以为 checksum 坏了）。
@@ -156,12 +156,12 @@ jobs:
             - `checksums.txt` - SHA256 checksums for all artifacts
 
             ### Server
-            - `jumpserver-mcp-exec-linux-amd64` - Linux x86_64
-            - `jumpserver-mcp-exec-linux-arm64` - Linux ARM64
-            - `jumpserver-mcp-exec-darwin-amd64` - macOS x86_64
-            - `jumpserver-mcp-exec-darwin-arm64` - macOS ARM64 (Apple Silicon)
-            - `jumpserver-mcp-exec-windows-amd64.exe` - Windows x86_64
-            - `jumpserver-mcp-exec-windows-arm64.exe` - Windows ARM64
+            - `jumpserver-exec-linux-amd64` - Linux x86_64
+            - `jumpserver-exec-linux-arm64` - Linux ARM64
+            - `jumpserver-exec-darwin-amd64` - macOS x86_64
+            - `jumpserver-exec-darwin-arm64` - macOS ARM64 (Apple Silicon)
+            - `jumpserver-exec-windows-amd64.exe` - Windows x86_64
+            - `jumpserver-exec-windows-arm64.exe` - Windows ARM64
 
             ### 接线
             这是一个 **MCP server**，不是命令行工具 ⇒ 用 MCP 客户端接线
@@ -169,7 +169,7 @@ jobs:
             `JUMPSERVER_TOKEN` 与 koko 私钥路径）。
             ⚠️ **koko 只认 `ssh-rsa`** —— ed25519 会被静默拒绝，
             而拒绝的样子长得像权限问题。详见
-            [README](https://github.com/yi-nology/jumpserver-mcp-exec#2-五分钟装好)。
+            [README](https://github.com/yi-nology/jumpserver-exec#2-五分钟装好)。
           files: ./artifacts/**/*
           draft: false
           prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}

@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
 // blockedCommand is the answer of a command that was NOT executed.

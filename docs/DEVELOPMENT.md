@@ -2,15 +2,15 @@
 
 > 面向想改这个仓的人。**先读 [`../AGENTS.md`](../AGENTS.md)** —— 那里记着架构不变量与铁律。
 > **共享纪律（铁律、底座发版节奏、跨仓守卫）在
-> [kit 仓的 AGENTS.md](https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md)。**
+> [kit 仓的 AGENTS.md](https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md)。**
 
 ## 1. 环境要求
 
 - Go **1.26+**
 - `./script/build.sh` 会跑 `go test ./...`，**不需要**真堡垒机
   （打真堡垒机的那部分由环境变量 gate 住，不设就 skip）
-- ⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.1` ——
-  **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-mcp-kit)**。
+- ⚠️ 本仓 `require github.com/yi-nology/jumpserver-kit v0.1.1` ——
+  **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-kit)**。
   离线机器上用 `GOPROXY=off`（只要 module cache 里已经有依赖）。
   ⚠️ 本地联调（kit 还没发布到 GitHub 时）用**不入库**的 `go.work`：
   `go.work` / `go.work.sum` 已在 `.gitignore` 里。
@@ -18,7 +18,7 @@
 ## 2. 常用命令
 
 ```bash
-./script/build.sh                    # 编译 + 跑测试（产物落在 ./bin/jumpserver-mcp-exec）
+./script/build.sh                    # 编译 + 跑测试（产物落在 ./bin/jumpserver-exec）
 ./script/build.sh --no-test          # 只编译
 go test ./...                        # 只跑测试
 go test -race ./...                  # ⚠️ 连接池的并发护栏要带 -race
@@ -56,7 +56,7 @@ python3 script/publish-mcp.py
 |---|---|---|
 | 仓库源码目录 | **源码**，唯一真相 | 你 / AI 迭代 |
 | `./bin/` | **构建产物** | `script/build.sh` |
-| `~/.local/jumpserver-mcp-exec-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
+| `~/.local/jumpserver-exec-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
 | MCP 配置文件 | **接线**，记录上面那个路径 + 环境变量 | `mcp update` |
 
 ## 4. 改一个工具的完整流程
@@ -94,7 +94,7 @@ python3 script/publish-mcp.py
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；答案本身必须是契约类型 |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
-| 自检 | `./bin/jumpserver-mcp-exec --doctor` 退出码 0 |
+| 自检 | `./bin/jumpserver-exec --doctor` 退出码 0 |
 | 真调 | 改了输出形状一定要**真调一次**（读工具对真堡垒机，写工具对假堡垒机）—— schema 校验只在答案被返回时才跑 |
 
 ⚠️ **别把「编译过」说成「已完成」。** 汇报时给出：编译结果、测试结果、工具数变化、
@@ -102,7 +102,7 @@ python3 script/publish-mcp.py
 
 ⚠️ **改动 ≥ 300 行，或动了协议 / 并发 / 权限身份 / 失败路径 / 存量行为** ⇒ 必须起一个
 **没参与过的独立审阅代理**看一遍。提示词模板在
-[kit 仓的 `script/review-prompt.md`](https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/script/review-prompt.md)，
+[kit 仓的 `script/review-prompt.md`](https://github.com/yi-nology/jumpserver-kit/blob/main/script/review-prompt.md)，
 里面还有一份「已经在哪些地方栽过」的清单 —— 审的人重点看那里。
 
 ## 6. 验证脚本

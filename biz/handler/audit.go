@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
 )
 
 // The audit trail tool: what the GATE decided, on this machine.
@@ -36,7 +36,7 @@ import (
 func RegisterAuditTools(r *reg.Registry, settings audit.Settings) {
 	dir := settings.TrailDir()
 	type auditArgs struct {
-		Service  string `json:"service,omitempty" jsonschema:"only the lines written by this server, e.g. jumpserver-mcp-exec or jumpserver-mcp"`
+		Service  string `json:"service,omitempty" jsonschema:"only the lines written by this server, e.g. jumpserver-exec or jumpserver-mgmt"`
 		Tool     string `json:"tool,omitempty" jsonschema:"only the lines of this tool, e.g. jmsx_exec"`
 		Client   string `json:"client,omitempty" jsonschema:"only the lines of this MCP client, e.g. the agent host's name"`
 		Allowed  *bool  `json:"allowed,omitempty" jsonschema:"true keeps the calls that were NOT refused (a failure counts as not refused — look at failed for those), false keeps the ones that were refused, rehearsed or stopped at the gate"`

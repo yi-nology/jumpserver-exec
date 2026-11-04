@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/oekit/pkg/mathx"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"time"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
 )
 
 const (

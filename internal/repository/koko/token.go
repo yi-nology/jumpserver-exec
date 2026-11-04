@@ -82,9 +82,9 @@ import (
 	"github.com/oekit/pkg/stringx"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/errs"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/errs"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // The connection-token protocol.

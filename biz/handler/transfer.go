@@ -23,14 +23,14 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/oekit/pkg/encoding"
 	"github.com/oekit/pkg/shellx"
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/risk"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/risk"
 )
 
 // runAcrossAssets runs work on every asset, in parallel, and returns the

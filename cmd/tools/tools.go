@@ -11,9 +11,9 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/router"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-exec/biz/router"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
 )
 
 // Run lists the tool catalogue: name, risk, and what it asks for.
@@ -30,7 +30,7 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		// listing — the management plane does the same, and a server that
 		// answers "I cannot list my own tools because you forgot a
 		// variable" is a worse answer than the catalogue.
-		fmt.Fprintf(stderr, "jumpserver-mcp-exec: %v\n", err)
+		fmt.Fprintf(stderr, "jumpserver-exec: %v\n", err)
 		cfg = config.Config{}
 	}
 	r := router.New(cfg, cfg.APIClient(), version, router.Options{})

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // Reading an asset's accounts can fail for two very different reasons, and

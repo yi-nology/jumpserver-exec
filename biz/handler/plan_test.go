@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/service/policy"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // The rehearsal of a fleet sweep has to answer a second question, not just

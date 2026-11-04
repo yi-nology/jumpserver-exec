@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // v4Bastion answers like a v4: the chat-ai prefix is not registered, and the

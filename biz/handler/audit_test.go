@@ -3,7 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,12 +11,12 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/service/policy"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/render"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/testsupport"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
+	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
 // The tool has to answer with the contract it declares, and the contract has
@@ -27,7 +27,7 @@ import (
 func TestAuditQueryAnswersTheLinesItFound(t *testing.T) {
 	dir := t.TempDir()
 	settings := audit.Settings{Mode: "file", Dir: dir}
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","args":"{\"command\":\"rm -rf /var/lib/x\"}",`+
 		`"allowed":false,"refused":"classified DANGEROUS",`+
 		`"stages":[{"stage":"capability","allow":true,"reason":"白名单放行: jmsx_exec"}],`+
@@ -51,7 +51,7 @@ func TestAuditQueryAnswersTheLinesItFound(t *testing.T) {
 	if e["tool"] != "jmsx_exec" {
 		t.Errorf("the entry says the tool is %v", e["tool"])
 	}
-	if e["service"] != "jumpserver-mcp-exec" {
+	if e["service"] != "jumpserver-exec" {
 		t.Errorf("the entry says the service is %v", e["service"])
 	}
 	if e["allowed"] != false {
@@ -80,7 +80,7 @@ func TestAuditQueryReportsTheCountAndTheTotal(t *testing.T) {
 	settings := audit.Settings{Mode: "file", Dir: dir}
 	for i := 0; i < 5; i++ {
 		writeLine(t, settings, `{"ts":"2026-10-28T09:00:0`+string(rune('0'+i))+`+08:00",`+
-			`"service":"jumpserver-mcp-exec","tool":"jmsx_exec","allowed":true}`)
+			`"service":"jumpserver-exec","tool":"jmsx_exec","allowed":true}`)
 	}
 
 	cs := testsupport.NewSession(t, "audit-test", reg.Options{Policy: policy.Table},
@@ -123,11 +123,11 @@ func TestAuditQueryAnswersAnEmptyTrail(t *testing.T) {
 func TestTheDeliveryFilterAnswersAndRefusesNonsense(t *testing.T) {
 	dir := t.TempDir()
 	settings := audit.Settings{Mode: "file", Dir: dir}
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","args":"{\"command\":\"rm -rf /var/lib/x\"}",`+
 		`"allowed":true,"failed":true,"delivery":"maybe_sent",`+
 		`"error":"the command may already be running on the machine"}`)
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:01+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:01+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","args":"{\"command\":\"uptime\"}",`+
 		`"allowed":true}`)
 
@@ -391,7 +391,7 @@ func TestTheAnswerSaysWhenItCouldNotReadEverything(t *testing.T) {
 	settings := audit.Settings{Mode: "file", Dir: dir}
 
 	// A line longer than the reader's limit.
-	long := `{"ts":"2026-10-28T09:00:01Z","service":"jumpserver-mcp-exec","tool":"jmsx_exec","args":"` +
+	long := `{"ts":"2026-10-28T09:00:01Z","service":"jumpserver-exec","tool":"jmsx_exec","args":"` +
 		strings.Repeat("x", 2_000_000) + `"}`
 	path := filepath.Join(dir, audit.FileName())
 	if err := os.WriteFile(path, []byte(long+"\n"), 0o600); err != nil {
@@ -422,7 +422,7 @@ func TestTheAnswerSaysWhenItCouldNotReadEverything(t *testing.T) {
 func TestTheAnswerDoesNotClaimItMissedAnything(t *testing.T) {
 	dir := t.TempDir()
 	settings := audit.Settings{Mode: "file", Dir: dir}
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","allowed":true}`)
 
 	cs := testsupport.NewSession(t, "audit-not-skipped-test", reg.Options{Policy: policy.Table},
@@ -453,7 +453,7 @@ func TestTheAnswerDoesNotClaimItMissedAnything(t *testing.T) {
 func TestTheAnswerNamesTheLimitThatWasAskedFor(t *testing.T) {
 	dir := t.TempDir()
 	settings := audit.Settings{Mode: "file", Dir: dir}
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","allowed":true}`)
 
 	cs := testsupport.NewSession(t, "audit-limit-test", reg.Options{Policy: policy.Table},
@@ -477,7 +477,7 @@ func TestTheAnswerSaysWhenItWasCutShort(t *testing.T) {
 	settings := audit.Settings{Mode: "file", Dir: dir}
 	for i := 0; i < 3; i++ {
 		writeLine(t, settings, fmt.Sprintf(
-			`{"ts":"2026-10-28T09:00:0%d+08:00","service":"jumpserver-mcp-exec","tool":"jmsx_exec","allowed":true}`, i))
+			`{"ts":"2026-10-28T09:00:0%d+08:00","service":"jumpserver-exec","tool":"jmsx_exec","allowed":true}`, i))
 	}
 
 	cs := testsupport.NewSession(t, "audit-truncated-test", reg.Options{Policy: policy.Table},
@@ -548,7 +548,7 @@ func TestTheAnswerPromisesNoMoreThanThePrunerKeeps(t *testing.T) {
 func TestTheAnswerSaysHowFarBackTheTrailGoes(t *testing.T) {
 	dir := t.TempDir()
 	settings := audit.Settings{Mode: "file", Dir: dir, RetentionDays: 7}
-	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-mcp-exec",`+
+	writeLine(t, settings, `{"ts":"2026-10-28T09:00:00+08:00","service":"jumpserver-exec",`+
 		`"tool":"jmsx_exec","allowed":true}`)
 
 	cs := testsupport.NewSession(t, "audit-retention-test", reg.Options{Policy: policy.Table},

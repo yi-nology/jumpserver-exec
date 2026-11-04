@@ -37,7 +37,7 @@ import (
 	"github.com/oekit/network/sshx"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // PoolTTL is how long an idle connection is kept.

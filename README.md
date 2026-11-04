@@ -1,4 +1,4 @@
-# jumpserver-mcp-exec — JumpServer 堡垒机的**执行面** MCP 服务
+# jumpserver-exec — JumpServer 堡垒机的**执行面** MCP 服务
 
 让 AI agent **经堡垒机**在受管机器上跑命令、传文件 —— 每一次动手都有录像、有留痕。
 
@@ -8,9 +8,9 @@
 
 | 仓库 | 是什么 | 工具数 |
 |---|---|---|
-| [`yi-nology/jumpserver-mcp`](https://github.com/yi-nology/jumpserver-mcp) | **管理面**：资产 / 账号 / 授权 / 连通性 / 命令过滤 / 标签 / 审计 / 登录策略 | 97 |
-| **`yi-nology/jumpserver-mcp-exec`**（本仓） | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 15 |
-| [`yi-nology/jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) | 共用底座：协议层 / 门禁 / 输出契约 / 留痕 / 脱敏（**是库，不是服务**） | — |
+| [`yi-nology/jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt) | **管理面**：资产 / 账号 / 授权 / 连通性 / 命令过滤 / 标签 / 审计 / 登录策略 | 97 |
+| **`yi-nology/jumpserver-exec`**（本仓） | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 15 |
+| [`yi-nology/jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) | 共用底座：协议层 / 门禁 / 输出契约 / 留痕 / 脱敏（**是库，不是服务**） | — |
 
 **AI 访问机器一律经堡垒机**，不接受直连 SSH —— 直连会丢审计录像。
 
@@ -40,11 +40,11 @@ PrivateToken 在堡垒机上拿：v5 是 `设置 → API 授权`，v4 是 `用�
 
 ```bash
 # 方式一：go install（需要 Go 1.26+）
-go install github.com/yi-nology/jumpserver-mcp-exec@latest
+go install github.com/yi-nology/jumpserver-exec@latest
 
 # 方式二：release 二进制（见 Releases 页）
-curl -LO https://github.com/yi-nology/jumpserver-mcp-exec/releases/latest/download/jumpserver-mcp-exec-linux-amd64
-chmod +x jumpserver-mcp-exec-linux-amd64
+curl -LO https://github.com/yi-nology/jumpserver-exec/releases/latest/download/jumpserver-exec-linux-amd64
+chmod +x jumpserver-exec-linux-amd64
 ```
 
 ### 2.2 接线（MCP 配置）
@@ -53,7 +53,7 @@ chmod +x jumpserver-mcp-exec-linux-amd64
 {
   "mcpServers": {
     "jumpserver-exec": {
-      "command": "jumpserver-mcp-exec",
+      "command": "jumpserver-exec",
       "env": {
         "JUMPSERVER_URL": "https://jumpserver.example.com",
         "JUMPSERVER_TOKEN": "<你的 PrivateToken>",
@@ -73,7 +73,7 @@ chmod +x jumpserver-mcp-exec-linux-amd64
 ### 2.3 自检
 
 ```bash
-jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
+jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 ```
 
 退出码：`0` = 正常，`1` = 有问题（看 `FAIL` 行），`2` = 用法错误。
@@ -104,7 +104,7 @@ jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
 
 ⚠️ **工具数看凭据**：`jmsx_inventory`（列资产）要 REST 凭据才注册 ——
 配了 `JUMPSERVER_TOKEN` 是 15 个，没配是 14 个（其余 14 个照常能用）。
-`jumpserver-mcp-exec tools` 列的是**当前**真正注册了的工具。
+`jumpserver-exec tools` 列的是**当前**真正注册了的工具。
 
 ---
 
@@ -122,7 +122,7 @@ jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
 | **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试 | `biz/handler` |
 
 > 上面三个 `pkg/*` 现在住在
-> [`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) —— 它们是两个服务
+> [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) —— 它们是两个服务
 > 共用的底座，不认任何一个服务。
 
 `skills/jms-exec-ops/` 是给 AI agent 的操作手册：选工具的正确姿势、写操作怎么确认、
@@ -174,8 +174,8 @@ jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
 目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `internal/` `pkg/` `etc/` `script/`）。
 
 ⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
-`go install github.com/yi-nology/jumpserver-mcp-exec@latest` 装出来的就是它
-（**不是** `…/cmd/jumpserver-mcp-exec@latest` —— 那个路径没有了）。
+`go install github.com/yi-nology/jumpserver-exec@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-exec@latest` —— 那个路径没有了）。
 
 ⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
 而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
@@ -190,7 +190,7 @@ main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
 放一个服务仓里，它就是那个服务披着共用名字的私有代码；另一个服务迟早也会伸手进去，
 两个服务就这么耦上了，而没有人决定过。
 
-⇒ 它们住在 [`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit)，
+⇒ 它们住在 [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit)，
 本仓 `require` 一个版本。
 
 ### 6.2 守卫（`internal/arch/`）
@@ -216,8 +216,8 @@ main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告与凭据处理纪律 |
 
 底座与管理面的文档在各自的仓里：
-[`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) ·
-[`jumpserver-mcp`](https://github.com/yi-nology/jumpserver-mcp)。
+[`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) ·
+[`jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt)。
 
 ---
 

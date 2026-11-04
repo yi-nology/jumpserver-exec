@@ -20,7 +20,7 @@ skills/
 
 ⚠️ **管理面的 skill 在另一个仓**：入口 skill `jumpserver-ops`、资产上线 `jms-onboarding`、
 权限核查 `jms-access-review` 在
-[`yi-nology/jumpserver-mcp`](https://github.com/yi-nology/jumpserver-mcp) 仓里 ——
+[`yi-nology/jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt) 仓里 ——
 它们跟着管理面服务走，不跟着执行面走。
 
 ## 安装
@@ -29,7 +29,7 @@ skills/
 `~/.minimax/agents/mavis/skills/`、`~/.claude/skills/`、`~/.codex/skills/`）：
 
 ```bash
-cd /path/to/jumpserver-mcp-exec
+cd /path/to/jumpserver-exec
 s=jms-exec-ops
 mkdir -p ~/.minimax/agents/mavis/skills/$s
 cp skills/$s/SKILL.md ~/.minimax/agents/mavis/skills/$s/
@@ -65,7 +65,7 @@ displayNames:
 （两个仓的技能一起看，因为执行面的 skill 会提到管理面的工具）：
 
 ```bash
-cd /path/to/jumpserver-mcp && ./script/check-skill-drift.sh
+cd /path/to/jumpserver-mgmt && ./script/check-skill-drift.sh
 ```
 
 它检查三个方向，其中两个算错误：

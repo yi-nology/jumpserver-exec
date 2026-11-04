@@ -8,8 +8,8 @@ import (
 	"github.com/oekit/concurrency/syncx"
 	"github.com/oekit/network/sshx"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // The branch that used to be dead.

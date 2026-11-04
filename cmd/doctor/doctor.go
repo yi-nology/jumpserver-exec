@@ -20,11 +20,11 @@ import (
 
 	"github.com/oekit/network/sshx"
 	"github.com/oekit/pkg/cli"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // The wiring check: it answers "would this server be able to open a
@@ -318,7 +318,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		report("warn", "identity", "no delegation secret: connection tokens are minted with the API token, "+
 			"so a session carries that token's authority (an administrator on this deployment) "+
 			"rather than the "+effUser+" account. Set JMS_DELEGATION_SECRET or write the secret to "+
-			"~/.config/jumpserver-mcp/delegation.key to keep the narrower identity"+unsetUser)
+			"~/.config/jumpserver-mgmt/delegation.key to keep the narrower identity"+unsetUser)
 	default:
 		dc := *cfg.Koko.Delegation
 		if err := api.EnsureDelegationIdentityAs(ctx, &dc, cfg.Koko.User); err != nil {
@@ -423,7 +423,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		report("warn", "koko_login", "no asset was available to test a login against")
 	}
 
-	text, failures := renderDoctor("jumpserver-mcp-exec", header, checks)
+	text, failures := renderDoctor("jumpserver-exec", header, checks)
 	fmt.Fprint(stdout, text)
 	if failures == 0 {
 		return cli.ExitOK

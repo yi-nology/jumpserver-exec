@@ -13,10 +13,10 @@ package router
 import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/service/policy"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // ServerName is how this server calls itself — in the trail, in the MCP
@@ -24,7 +24,7 @@ import (
 //
 // ⚠️ 它是**一个**名字，不是两个：留痕里写一个名字、握手里报另一个名字，
 // 那两份日志就分不出谁是谁。
-const ServerName = "jumpserver-mcp-exec"
+const ServerName = "jumpserver-exec"
 
 // Options is what the caller may turn when it assembles the server.
 type Options struct {

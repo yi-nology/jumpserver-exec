@@ -17,9 +17,9 @@ import (
 
 	"github.com/oekit/pkg/cli"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/router"
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/config"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-exec/biz/router"
+	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
 )
 
 // Run serves MCP over stdio until the transport closes.
@@ -29,7 +29,7 @@ import (
 func Run(ctx context.Context, version string, args []string, stdout, stderr io.Writer) int {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "jumpserver-mcp-exec: %v\n", err)
+		fmt.Fprintf(os.Stderr, "jumpserver-exec: %v\n", err)
 		return cli.ExitError
 	}
 
@@ -37,7 +37,7 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 	// Fail soft so the server still starts and the exec tools keep working.
 	c := cfg.APIClient()
 	if c == nil {
-		fmt.Fprintf(os.Stderr, "jumpserver-mcp-exec: REST client unavailable: JUMPSERVER_TOKEN is not set (jmsx_inventory disabled)\n")
+		fmt.Fprintf(os.Stderr, "jumpserver-exec: REST client unavailable: JUMPSERVER_TOKEN is not set (jmsx_inventory disabled)\n")
 	}
 
 	r := router.New(cfg, c, version, router.Options{
@@ -52,7 +52,7 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		OnRecord: audit.Trail(cfg.Audit.Options(router.ServerName)),
 	})
 	if err := r.Serve(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "jumpserver-mcp-exec: server failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "jumpserver-exec: server failed: %v\n", err)
 		return cli.ExitError
 	}
 	return cli.ExitOK

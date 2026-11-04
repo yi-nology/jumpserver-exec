@@ -1,4 +1,4 @@
-# jumpserver-mcp-exec
+# jumpserver-exec
 
 MCP server that lets an AI agent run commands on machines managed by a
 JumpServer bastion — **always through the bastion**, never by connecting to the
@@ -106,7 +106,7 @@ are carried as 0x1E across the terminal and restored on the way out.
 ⚠️ The two `koko` variables have **no default**: a default would point one
 deployment's clients at somebody else's bastion. With `JMS_BACKEND=auto` they are
 only needed for the terminal fallback — the connection-token backend talks to
-the REST API instead. `jumpserver-mcp-exec --doctor` says which of the two you are in.
+the REST API instead. `jumpserver-exec --doctor` says which of the two you are in.
 
 The koko account must be registered in JumpServer's `SSHKey` table (v5 keeps
 user public keys there, **not** in the legacy `User.public_key` field), must use
@@ -247,7 +247,7 @@ version and no version lie in any go.mod.
 ## Build
 
 ```bash
-go build -o jumpserver-mcp-exec .
+go build -o jumpserver-exec .
 go test ./...
 ```
 

@@ -1,9 +1,9 @@
-# AGENTS.md — jumpserver-mcp-exec 迭代指南
+# AGENTS.md — jumpserver-exec 迭代指南
 
 > 给 AI agent 的作业说明。**改这个仓的代码前先读完本页**，尤其第 1、2 节。
 
 本仓 = JumpServer 堡垒机的**执行面** MCP 服务：经堡垒机 koko(2222) 在**受管机器**上
-跑命令、传文件。**15 个工具**，一个二进制 `jumpserver-mcp-exec`。
+跑命令、传文件。**15 个工具**，一个二进制 `jumpserver-exec`。
 面向人读的完整说明在 [`README.md`](README.md)，
 **配置与排障看 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**。
 
@@ -13,15 +13,15 @@
 
 | 仓 | 是什么 | 干什么 |
 |---|---|---|
-| [`yi-nology/jumpserver-mcp`](https://github.com/yi-nology/jumpserver-mcp) | MCP server `jumpserver` | **管理面** — 改堡垒机自己的配置 |
-| [`yi-nology/jumpserver-mcp-exec`](https://github.com/yi-nology/jumpserver-mcp-exec)（本仓） | MCP server `jumpserver-exec` | **执行面** — 经堡垒机在**受管机器**上跑命令、传文件 |
-| [`yi-nology/jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) | 共用底座（**库**） | 协议层 / 门禁 / 输出契约 / 留痕 / 脱敏 / 风险分类 / 共用词汇 / 守卫的机械 |
+| [`yi-nology/jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt) | MCP server `jumpserver` | **管理面** — 改堡垒机自己的配置 |
+| [`yi-nology/jumpserver-exec`](https://github.com/yi-nology/jumpserver-exec)（本仓） | MCP server `jumpserver-exec` | **执行面** — 经堡垒机在**受管机器**上跑命令、传文件 |
+| [`yi-nology/jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) | 共用底座（**库**） | 协议层 / 门禁 / 输出契约 / 留痕 / 脱敏 / 风险分类 / 共用词汇 / 守卫的机械 |
 
 **共享纪律（铁律、验证要求、提交约定、底座怎么发版）在 kit 仓的 AGENTS.md 里**：
-👉 <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md>
+👉 <https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md>
 
 ⚠️ **只读本仓的 agent 也要拿到底线** ⇒ §1 把最关键的铁律**原文重复**了一遍。
-⚠️ **底座在 kit 仓**：本仓 `require github.com/yi-nology/jumpserver-mcp-kit`，
+⚠️ **底座在 kit 仓**：本仓 `require github.com/yi-nology/jumpserver-kit`，
 协议层（`pkg/jmsapi`）、门禁（`pkg/reg`）、结果整形与输出契约（`pkg/render`）、
 留痕（`pkg/audit`）、脱敏（`pkg/redact`）、风险分类（`pkg/risk`）、
 失败分类（`pkg/errs`）、共用词汇（`model/jms`）**都不在本仓**。
@@ -55,8 +55,8 @@ skills/                     # 给 AI 的操作手册
 ```
 
 ⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
-`go install github.com/yi-nology/jumpserver-mcp-exec@latest` 装出来的就是它
-（**不是** `…/cmd/jumpserver-mcp-exec@latest` —— 那个路径没有了）。
+`go install github.com/yi-nology/jumpserver-exec@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-exec@latest` —— 那个路径没有了）。
 
 ⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
 而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
@@ -78,7 +78,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 ## 1. 铁律（原文重复 —— 完整版在 kit 仓的 AGENTS.md）
 
-> 完整版：<https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> §2
+> 完整版：<https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md> §2
 > 下面这几条是**只读本仓也要拿到底线**的。
 
 1. **⚠️ 失败之后，绝不能重试一条 `maybe_sent` 的命令。**
@@ -114,12 +114,12 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
    只接受 `readonly`/`vendor`，带了会直接报错。
 
 7. **源码树里不要留构建产物。** 产物落在 `./bin/`（发布后落在
-   `~/.local/jumpserver-mcp-exec-runtime/<stamp>/`）。历史上编辑器备份文件、
+   `~/.local/jumpserver-exec-runtime/<stamp>/`）。历史上编辑器备份文件、
    swap 文件、零字节标记（`*-go-tmp-umask`）把源目录搞得像垃圾场，**已清理，别再产生**。
 
 8. **大改之后要有一双没参与过的眼睛。** 改动 ≥ 300 行，或动了**协议 / 并发 /
    权限身份 / 失败路径 / 存量行为**其中任何一项，就必须起一个**独立 verifier 子代理**
-   审一遍，提示词用 [`script/review-prompt.md`](https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/script/review-prompt.md)
+   审一遍，提示词用 [`script/review-prompt.md`](https://github.com/yi-nology/jumpserver-kit/blob/main/script/review-prompt.md)
    里的模板。
    - **为什么不是「自己再读一遍」**：自己写的代码自己看不出盲区。
    - **审阅结论要贴进汇报**：修了哪几条、哪几条判定为不属实。**没贴就等于没审。**
@@ -163,7 +163,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
   且普通账号的 `Account.alias` 本就等于它的 id ⇒ **UUID 在 v4 上照样通**。
 - ⚠️ **令牌默认用委派凭据签发**，令牌的 `user` 就是被委派用户（例如 `ai`，即你自己的那个账号），
   权限面与从前一致；没配到委派 secret 就会用 API token 签 ⇒ **那是管理员权限面**。
-  `jumpserver-mcp-exec --doctor` 的 `identity` 一行会写明当前是哪种。
+  `jumpserver-exec --doctor` 的 `identity` 一行会写明当前是哪种。
 - ⚠️ **v4 上没有委派**（没有 `chat_ai` 应用）⇒ 令牌只能用 API 凭据签 ⇒ 管理员权限面。
   ⚠️ **这不是配置能解决的**：v4 上不存在更窄的凭据。
   ⚠️ 而且**必须关掉委派**：委派请求不带 API token ⇒ v4 回 401 ⇒ 401 在那条路上被读成
@@ -349,7 +349,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 4. **koko 只认 `ssh-rsa`。** ed25519 公钥堡垒机会「安静地接受」，
    但 koko 一律拒绝 —— 症状是 `Permission denied (password,publickey)`，
    **看起来像凭据错，其实是密钥类型错**。
-   `jumpserver-mcp-exec --doctor` 的 `key_type` 一项判定私钥的真实类型
+   `jumpserver-exec --doctor` 的 `key_type` 一项判定私钥的真实类型
    （走 `oekit/network/sshx` 的 `DetectKeyType`，三级回落：直接解析私钥 →
    `ssh-keygen -y` → 文件头嗅探），**提前抓住**这个坑。
 
@@ -372,7 +372,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 | 检查 | 怎么过 |
 |---|---|
-| 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-mcp-exec`） |
+| 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-exec`） |
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
 | 竞态 | 池的并发护栏在 `internal/repository/koko/pool_test.go` ⇒ **必须带 `-race` 跑** |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
@@ -381,7 +381,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
 | **凭据** | 明文凭据不许进仓（底座 `pkg/arch/credential.go` + 本仓 `internal/arch/execution_test.go` 的 `TestThePlaintextCredentialsAreNotInTheRepository`）⇒ 守卫体一份，两个面各接一个入口 |
-| 自检 | `./bin/jumpserver-mcp-exec --doctor` 退出码 0（查密钥类型 / 端口 / 真实 koko 登录） |
+| 自检 | `./bin/jumpserver-exec --doctor` 退出码 0（查密钥类型 / 端口 / 真实 koko 登录） |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
 
 ⚠️ **别把「编译过」说成「已完成」。** 汇报时给出：编译结果、测试结果、工具数变化、
@@ -431,8 +431,8 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | [`CHANGELOG.md`](CHANGELOG.md) | 变更记录（Keep a Changelog） |
 | [`docs/KOKO-NOTES.md`](docs/KOKO-NOTES.md) | 执行面细节 |
 | [`skills/`](skills/) | **给 AI 的操作手册**（jms-exec-ops） |
-| **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
-| **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |
+| **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
+| **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |
 
 **AI 访问机器一律经堡垒机 koko(2222)**，不接受直连 SSH —— 直连会丢审计录像。
 

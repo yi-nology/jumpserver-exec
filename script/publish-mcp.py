@@ -25,11 +25,11 @@ import subprocess
 import sys
 import time
 
-BIN_NAME = "jumpserver-mcp-exec"
+BIN_NAME = "jumpserver-exec"
 # MCP 配置里那个 server 的名字。
 # ⚠️ 可用 JMS_MCP_SERVER 覆盖：配置里的名字是**部署的事**，仓里不该钉死
 # （部署可能把两个服务配成别的名字）。
-SERVER_NAME = os.environ.get("JMS_MCP_SERVER", "jumpserver-mcp-exec")
+SERVER_NAME = os.environ.get("JMS_MCP_SERVER", "jumpserver-exec")
 
 # 仓根由脚本自己的位置推出来 ⇒ 整个目录可以随便改名或搬走，不用改路径。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,7 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 运行时目录：每个仓一个（管理面与执行面是**两个** MCP 服务，两条发布线）。
 RUNTIME_ROOT = os.path.expanduser(
     os.environ.get("JMS_RUNTIME_ROOT",
-                    os.path.join("~", ".local", "jumpserver-mcp-exec-runtime")))
+                    os.path.join("~", ".local", "jumpserver-exec-runtime")))
 
 # ⚠️ 凭据不在本仓里：它从**运行环境**读，运行环境没有就从 MCP 运行时自己的
 # 配置文件读（同一个地方，服务自己也是从那儿拿的）。环境变量优先 ——

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/internal/repository/koko"
+	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
 )
 
 // The upload side compares two checksums: the one computed on the bytes that

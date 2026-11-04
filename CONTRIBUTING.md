@@ -1,4 +1,4 @@
-# 参与贡献（jumpserver-mcp-exec）
+# 参与贡献（jumpserver-exec）
 
 感谢你愿意动手。这个仓的规矩比一般项目多几条 —— 不是为了仪式感，是因为**这个仓的前任栽过跟头，
 而那些跟头现在都写成了守卫**，绕开守卫的 PR 会在评审时被挡回来。
@@ -8,7 +8,7 @@
 1. 读 [`AGENTS.md`](AGENTS.md) —— 它记着架构不变量（底座不得依赖服务、
    两个服务不得互相 import、契约类型必须真被产出）与「已经在哪些地方栽过」的清单；
 2. 读 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) —— 怎么构建、怎么验证、常见坑；
-3. **共享纪律在底座仓**：<https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md>
+3. **共享纪律在底座仓**：<https://github.com/yi-nology/jumpserver-kit/blob/main/AGENTS.md>
    （铁律、底座怎么发版、跨仓守卫）；
 4. 认领一个 issue（或者自己开一个，说清要改什么行为）。
 
@@ -17,7 +17,7 @@
 Go **1.26+**。不需要真堡垒机就能跑全量测试（打真堡垒机的那部分由环境变量 gate 住）。
 
 ```bash
-./script/build.sh        # 编译 + 跑测试（产物落在 ./bin/jumpserver-mcp-exec）
+./script/build.sh        # 编译 + 跑测试（产物落在 ./bin/jumpserver-exec）
 ./script/build.sh --no-test   # 只编译
 go test ./...            # 只跑测试
 go test -race ./...      # ⚠️ 池的并发护栏要带 -race
@@ -25,8 +25,8 @@ gofmt -l .               # 格式化检查（应无输出）
 go vet ./...             # 静态检查
 ```
 
-⚠️ 本仓 `require github.com/yi-nology/jumpserver-mcp-kit v0.1.1`
-—— **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-mcp-kit)**，
+⚠️ 本仓 `require github.com/yi-nology/jumpserver-kit v0.1.1`
+—— **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-kit)**，
 不在本仓里。离线机器上用 `GOPROXY=off`（只要 module cache 里已经有依赖）。
 ⚠️ 本地联调（kit 还没发布到 GitHub 时）用**不入库**的 `go.work`：
 `go.work` / `go.work.sum` 已在 `.gitignore` 里。
@@ -43,7 +43,7 @@ go vet ./...             # 静态检查
 | **加工具要改工具数** | **15**（没有 REST 凭据时是 **14**：`jmsx_inventory` 只在有 API client 时注册） |
 | **改了 IDL 要重新生成** | `./script/gen-idl.sh`，生成物入库 |
 | **别跑 `go mod tidy`** | 受限网络下会失败；手工同步 `go.mod` 的 `require` |
-| **别提交构建产物** | 产物落在 `./bin/`（发布后落在 `~/.local/jumpserver-mcp-exec-runtime/<stamp>/`） |
+| **别提交构建产物** | 产物落在 `./bin/`（发布后落在 `~/.local/jumpserver-exec-runtime/<stamp>/`） |
 | **别在 `go.mod` 里写 `replace`** | 那会让 `go.mod` 与机器绑定；本地联调用不入库的 `go.work` |
 
 ## 验证要求（交付前必须过）
@@ -55,7 +55,7 @@ go vet ./...             # 静态检查
   schema 校验只在答案被返回时才跑，「编译过 + 单测绿」**不等于**形状对；
 - 改动 ≥ 300 行，或动了**协议 / 并发 / 权限身份 / 失败路径 / 存量行为** ⇒
   起一个**没参与过的独立审阅代理**看一遍。提示词模板在
-  [kit 仓的 `script/review-prompt.md`](https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/script/review-prompt.md)。
+  [kit 仓的 `script/review-prompt.md`](https://github.com/yi-nology/jumpserver-kit/blob/main/script/review-prompt.md)。
 
 ## 提交信息
 

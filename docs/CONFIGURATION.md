@@ -1,13 +1,13 @@
 # JumpServer MCP 执行面配置指南
 
-执行面 MCP 服务（`jumpserver-mcp-exec`）的配置说明：
+执行面 MCP 服务（`jumpserver-exec`）的配置说明：
 怎么接线、每个环境变量是什么、怎么自检、出问题怎么查。
 
 > 本文面向**要装、要调、要修**的人。只想知道「用哪个工具」看
 > [§5 工具选择速查](#5-工具选择速查)；只想跑起来，看 [§2 五分钟装好](#2-五分钟装好)。
 >
 > **管理面**（另一个服务）的配置在
-> [jumpserver-mcp 仓的 CONFIGURATION.md](https://github.com/yi-nology/jumpserver-mcp/blob/main/docs/CONFIGURATION.md)。
+> [jumpserver-mgmt 仓的 CONFIGURATION.md](https://github.com/yi-nology/jumpserver-mgmt/blob/main/docs/CONFIGURATION.md)。
 
 ---
 
@@ -15,12 +15,12 @@
 
 ```
        ┌──────────────────┐         ┌──────────────────┐
-       │  jumpserver-mcp  │  REST   │  JumpServer 部署  │
+       │  jumpserver-mgmt  │  REST   │  JumpServer 部署  │
        │  (管理面, 97 工具) ├────────►│                  │
        └──────────────────┘         └────────┬─────────┘
                                              │ koko :2222
        ┌──────────────────┐         ┌────────┴─────────┐
-       │ jumpserver-mcp-  │  SSH    │  受管机器          │
+       │ jumpserver-mgmt-  │  SSH    │  受管机器          │
        │ exec (本服务,    ├────────►│  (录像可审计)      │
        │ 15 工具)          │         │                   │
        └──────────────────┘         └───────────────────┘
@@ -30,12 +30,12 @@
 
 | 服务 | 管什么 | 不管什么 |
 |---|---|---|
-| `jumpserver-mcp`（管理面） | 资产、账号、权限、标签、命令过滤、审计、授权 | 不在机器上执行命令 |
-| `jumpserver-mcp-exec`（本服务） | 在机器上跑命令、传文件 | 不改堡垒机配置 |
+| `jumpserver-mgmt`（管理面） | 资产、账号、权限、标签、命令过滤、审计、授权 | 不在机器上执行命令 |
+| `jumpserver-exec`（本服务） | 在机器上跑命令、传文件 | 不改堡垒机配置 |
 
 执行面也读 `JUMPSERVER_URL` + `JUMPSERVER_TOKEN`（用来换连接令牌、列资产），
 并且**共用同一份 REST 协议实现**（在
-[jumpserver-mcp-kit](https://github.com/yi-nology/jumpserver-mcp-kit) 仓：
+[jumpserver-kit](https://github.com/yi-nology/jumpserver-kit) 仓：
 传输、重试、限流、v5 的两种列表形状、**端点表**）。
 协议只有一份，所以在管理面修好的东西（比如按字符边界截断、避免切坏多字节字符）
 执行面自动就有。
@@ -86,14 +86,14 @@ cat ~/.ssh/id_rsa.pub
 两个服务都是 **stdio** 传输。执行面用 `mcp update` 指向运行时的二进制：
 
 ```bash
-mcp update name=jumpserver-exec command=<jumpserver-mcp-exec 的绝对路径>
+mcp update name=jumpserver-exec command=<jumpserver-exec 的绝对路径>
 ```
 
 `env` 是只写字段（写进去读不回来），一次性把变量都给全：
 
 ```bash
 mcp update name=jumpserver-exec \
-  command=/usr/local/bin/jumpserver-mcp-exec \
+  command=/usr/local/bin/jumpserver-exec \
   env='{"JMS_BASTION_HOST":"jumpserver.example.com","JMS_KOKO_USER":"ai","JMS_KOKO_KEY":"~/.ssh/id_rsa","JUMPSERVER_URL":"https://jumpserver.example.com","JUMPSERVER_TOKEN":"<token>"}'
 ```
 
@@ -106,7 +106,7 @@ mcp update name=jumpserver-exec \
   "mcpServers": {
     "jumpserver-exec": {
       "type": "stdio",
-      "command": "/usr/local/bin/jumpserver-mcp-exec",
+      "command": "/usr/local/bin/jumpserver-exec",
       "env": {
         "JMS_BASTION_HOST": "jumpserver.example.com",
         "JMS_KOKO_USER": "ai",
@@ -124,10 +124,10 @@ mcp update name=jumpserver-exec \
 二进制有 `--doctor`，不依赖 MCP 会话，可以直接从 shell 跑：
 
 ```bash
-jumpserver-mcp-exec --doctor    # 执行面接线 + 真实 koko 登录验证
+jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 ```
 
-`doctor` 同时也是子命令形态（`jumpserver-mcp-exec doctor`，与 `--doctor` 等价），
+`doctor` 同时也是子命令形态（`jumpserver-exec doctor`，与 `--doctor` 等价），
 `--help` 打印用法。退出码沿用 OEKIT `pkg/cli` 的约定：`0` = 正常、`1` = 有问题、
 `2` = 用法错误（未知子命令 / 参数不合法）。
 
@@ -157,15 +157,15 @@ jumpserver-mcp-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 | `JUMPSERVER_URL` | 否 | **无** | 堡垒机地址，不要带尾部斜杠（代码会 `TrimRight`），也不带 `/api/v1`。⚠️ **执行面不强制**：缺了连接令牌那条路就没有（只走 koko 终端），资产清单工具也停用 |
 | `JUMPSERVER_TOKEN` | 否 | 无 | JumpServer **PrivateToken**，呈现为 `Authorization: Token <key>`。⚠️ **不是 v5 专有**：v4 也注册了 `PrivateTokenAuthentication`。缺失时**执行面不启动失败**（它可以只走 koko），但资产清单与令牌后端都停用 |
 | `JUMPSERVER_USERNAME` | 否 | 无 | 另一种凭据：**用账号密码登录**，堡垒机换成 Bearer token（`POST /api/v1/authentication/auth/`） |
-| `JUMPSERVER_PASSWORD` | 跟 `JUMPSERVER_USERNAME` 配 | 无 | 上面那个登录的密码。⚠️ **优先读文件**（`~/.config/jumpserver-mcp/password`，0600），环境变量是退路 —— 长跑进程的环境在 Linux 上是 `/proc` 里谁都能读的 |
+| `JUMPSERVER_PASSWORD` | 跟 `JUMPSERVER_USERNAME` 配 | 无 | 上面那个登录的密码。⚠️ **优先读文件**（`~/.config/jumpserver-mgmt/password`，0600），环境变量是退路 —— 长跑进程的环境在 Linux 上是 `/proc` 里谁都能读的 |
 | `JUMPSERVER_OTP` | 否 | 无 | base32 的 TOTP 密钥。**只在堡垒机要求二次验证时用得上** |
 | `JUMPSERVER_VERSION` | 否 | `auto` | 堡垒机是 **v4** 还是 **v5**：`v4` / `v5` / `auto`（探测）。⚠️ 它只决定**一件事**：v4 **没有** Chat AI 委派方案 ⇒ 会话只能以 API 凭据的身份跑（= 管理员面） |
 | `JMS_REQUESTS_PER_SECOND` | 否 | `20` | 客户端对堡垒机的请求速率上限（令牌桶） |
 | `JMS_BURST` | 否 | `40` | 令牌桶的突发额度 |
 | `JUMPSERVER_TIMEOUT` | 否 | `90s` | 单次 API 调用超时 |
-| `JMS_SERVER_NAME` | 否 | `jumpserver-mcp-exec` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
+| `JMS_SERVER_NAME` | 否 | `jumpserver-exec` | 服务在门禁审计留痕里的标识（留痕的 `service` 字段） |
 | `JMS_AUDIT` | 否 | `file` | 门禁留痕要不要**落盘**：`file`（每个进程一份 JSONL）或 `off`（只写 stderr） |
-| `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mcp/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
+| `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mgmt/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
 | `JMS_AUDIT_RETENTION_DAYS` | 否 | `7` | 留痕文件保留多少天。**0 或负数 = 不按时间清**（⚠️ 但**空文件**那条规则照样删：安静超过一小时的空文件与保留期无关）。⚠️ 保留期是**文件级**的：超过保留期**且进程已结束**的文件会被清理；正在运行的进程的文件不删 ⇒ 文件里的行可能比这个窗口更老 |
 
 ⚠️ **两种凭据都配了怎么办**：`JUMPSERVER_TOKEN` 赢 —— 它不过期，登录换来的 Bearer token 会过期。
@@ -181,15 +181,15 @@ jumpserver-mcp-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 secret 的**推荐存放位置**（权限 0600）：
 
 ```bash
-mkdir -p ~/.config/jumpserver-mcp
-chmod 700 ~/.config/jumpserver-mcp
-printf '%s' "$CHAT_AI_DELEGATION_SECRET" > ~/.config/jumpserver-mcp/delegation.key
-chmod 600 ~/.config/jumpserver-mcp/delegation.key
+mkdir -p ~/.config/jumpserver-mgmt
+chmod 700 ~/.config/jumpserver-mgmt
+printf '%s' "$CHAT_AI_DELEGATION_SECRET" > ~/.config/jumpserver-mgmt/delegation.key
+chmod 600 ~/.config/jumpserver-mgmt/delegation.key
 ```
 
 程序会依次找 `JMS_DELEGATION_SECRET` 环境变量 →
-`~/.config/jumpserver-mcp/delegation.key` →
-`~/.local/etc/jumpserver-mcp/delegation.key`。
+`~/.config/jumpserver-mgmt/delegation.key` →
+`~/.local/etc/jumpserver-mgmt/delegation.key`。
 
 **委派凭据是什么**：一次性、单次、60 秒内有效、绑定
 「方法 + 路径 + query + body」的凭据。它**不额外授权** —— 走的是正常 RBAC，
@@ -234,7 +234,7 @@ chmod 600 ~/.config/jumpserver-mcp/delegation.key
 
 ⚠️ **身份**：令牌默认通过**委派凭据**签发，令牌的 `user` 就是被委派的那个用户（例如 `ai`），
 所以会话的权限面和以前一模一样。没有配到委派 secret 时，令牌会用 API token 签 ——
-那是一个**管理员**的权限面，比 `ai` 宽。`jumpserver-mcp-exec --doctor` 的 `identity` 一行
+那是一个**管理员**的权限面，比 `ai` 宽。`jumpserver-exec --doctor` 的 `identity` 一行
 会写明当前是哪种。
 
 ### 3.5 连接池
@@ -283,7 +283,7 @@ chmod 600 ~/.config/jumpserver-mcp/delegation.key
 | 落在哪 | `JMS_AUDIT_DIR` 下的 `audit-<日期>-<pid>-<随机>.jsonl`，**每个进程一份**（两个服务同时跑不会互相踩） |
 | 权限 | 目录 0700、文件 0600（里面是每次调用的参数） |
 | 格式 | 一行一个 JSON：`ts` / `service` / `tool` / `client` / `args` / `allowed` / `refused` / `dry_run` / `would_execute` / `failed` / `stages[]` / `duration_ms` / `out_bytes` / `error` / `delivery` |
-| `service` | **服务名**：本服务是 `jumpserver-mcp-exec`。⚠️ **老留痕里写的是旧的服务名** ⇒ 按服务过滤时老记录**默认匹配不上** |
+| `service` | **服务名**：本服务是 `jumpserver-exec`。⚠️ **老留痕里写的是旧的服务名** ⇒ 按服务过滤时老记录**默认匹配不上** |
 | `client` | **谁调的**：MCP 客户端在 initialize 时自报的名字。⚠️ 它是**客户端自报**的，不是认证过的身份 —— 当线索用可以，当证据用不行 |
 | `allowed` 的口径 | **「没有被拒绝」，不是「跑成功了」**。`false` ⇒ 什么都没跑；`true` ⇒ 没被拒 —— 但它**可能失败了**，看 `failed` / `error` 那一列 |
 | `failed` | **这次调用的「活」干砸了**。⚠️ **门禁拒掉一次调用不算失败** —— 那是门禁在干活 |
@@ -296,7 +296,7 @@ chmod 600 ~/.config/jumpserver-mcp/delegation.key
 | 载荷字段 | `content` / `content_base64` / `body` 这类**载荷**只记长度不记内容 |
 | `args` 截断 | 超过 500 字节会截断，**切在字符边界上** |
 | 文件大小 | 单个文件超过 32MB 自动轮转（归档成 `.1`，**rename 是原子替换**）。⚠️ **轮转失败时文件留痕就此停止** —— **单文件**的上限是磁盘的**硬边界**；那一行日志会说明这件事，`--doctor` 的 `audit_trail` 也会报出来 |
-| 怎么读 | `tail -f ~/.local/state/jumpserver-mcp/audit/*.jsonl*`（末尾那个 `*` 把轮转的 `.1` 也带上），或用 `jmsx_audit_query` 工具 |
+| 怎么读 | `tail -f ~/.local/state/jumpserver-mgmt/audit/*.jsonl*`（末尾那个 `*` 把轮转的 `.1` 也带上），或用 `jmsx_audit_query` 工具 |
 | 一次最多几行 | `jmsx_audit_query` 单次**最多 500 行** —— 答复是一个列表，没有上限的列表一次就能塞满调用方的上下文 |
 | 留痕目录为空时 | 写侧与读侧说**同一句话**：没有目录 = **没有留痕文件** |
 | 关掉 | `JMS_AUDIT=off` —— 只留 stderr 那一行 |
@@ -308,10 +308,10 @@ chmod 600 ~/.config/jumpserver-mcp/delegation.key
 
 ## 4. 自检
 
-### 4.1 `jumpserver-mcp-exec --doctor`
+### 4.1 `jumpserver-exec --doctor`
 
 ```
-jumpserver-mcp-exec doctor
+jumpserver-exec doctor
   bastion: jumpserver.example.com:2222 as ai
   key:     ~/.ssh/id_rsa
   backend: auto
@@ -324,7 +324,7 @@ jumpserver-mcp-exec doctor
   [OK  ] version         v5 (detected), delegation scheme: present
   [OK  ] identity        connection tokens are minted as the delegated user "ai" (the account the sessions have always run as)
   [OK  ] connection_pool 0 connection(s) open; an idle one is closed after 2m0s. ...
-  [OK  ] audit_trail     ~/.local/state/jumpserver-mcp/audit (one JSONL file per process; read it with the jmsx_audit_query tool): N file(s), the oldest from <date>
+  [OK  ] audit_trail     ~/.local/state/jumpserver-mgmt/audit (one JSONL file per process; read it with the jmsx_audit_query tool): N file(s), the oldest from <date>
   [OK  ] backend_memory  nothing remembered yet; the connection-token path is tried first
   [OK  ] koko_login      logged in on <asset> via the connection token backend as ai (opening took 0.83s, exit 0, host says "user\n<asset>")
 result: healthy
@@ -423,7 +423,7 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 |---|---|---|
 | 仓库源码目录 | **源码**，唯一真相 | 你 / AI |
 | `./bin/` | **构建产物** | `script/build.sh` |
-| `~/.local/jumpserver-mcp-exec-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
+| `~/.local/jumpserver-exec-runtime/<stamp>/` | **运行时二进制**，MCP 配置指向这里 | `script/publish-mcp.py` |
 | 你的 MCP 客户端配置文件 | **接线**，记录上面那个路径 + 环境变量 | `mcp update` |
 
 **改源码 ≠ 生效。** 已经跑起来的 MCP 进程还持有旧二进制，必须重启会话。

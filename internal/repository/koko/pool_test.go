@@ -24,7 +24,7 @@ import (
 
 	"github.com/oekit/concurrency/syncx"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // fakeAPI returns a client whose bastion answers with a fixed set of

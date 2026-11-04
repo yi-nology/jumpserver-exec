@@ -17,14 +17,14 @@ package koko
 import (
 	"context"
 	"fmt"
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/oekit/pkg/shellx"
 
-	"github.com/yi-nology/jumpserver-mcp-exec/biz/model/jmsexec"
+	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 )
 
 type Session struct {

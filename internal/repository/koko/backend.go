@@ -38,8 +38,8 @@ import (
 
 	"github.com/oekit/pkg/slicex"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/model/jms"
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/jmsapi"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
 
 // The backend modes.

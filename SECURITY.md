@@ -1,4 +1,4 @@
-# 安全策略（jumpserver-mcp-exec）
+# 安全策略（jumpserver-exec）
 
 ## 报告漏洞
 
@@ -40,7 +40,7 @@
 
 ## 留痕（audit trail）本身也是数据
 
-留痕文件（默认 `~/.local/state/jumpserver-mcp/audit`，一进程一文件，0600）里记着
+留痕文件（默认 `~/.local/state/jumpserver-mgmt/audit`，一进程一文件，0600）里记着
 「谁在这台机器上试图跑什么」。**它也是敏感数据**：把它当审计资料保管，
 别整目录丢进共享盘或日志系统。
 
@@ -49,11 +49,11 @@
 
 ## 依赖与供应链
 
-本仓依赖 `github.com/yi-nology/jumpserver-mcp-kit`（共用底座，Apache-2.0）、
+本仓依赖 `github.com/yi-nology/jumpserver-kit`（共用底座，Apache-2.0）、
 `oagentkit/*`、`oekit/*`（MIT）、`modelcontextprotocol/go-sdk`（MIT→Apache-2.0 过渡）、
 `google/jsonschema-go`（MIT）。构建**不写 `replace`**（依赖按普通方式解析，`go.sum` 钉住内容）。
 
-⚠️ **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-mcp-kit)** ——
+⚠️ **底座在 [kit 仓](https://github.com/yi-nology/jumpserver-kit)** ——
 它的漏洞会同时落在两个服务上；报告时注明你看到的是哪个服务的行为。
 
 发现依赖有问题 ⇒ 按上面的私密渠道报，别在公开 issue 里贴 exploit。

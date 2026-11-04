@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yi-nology/jumpserver-mcp-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/audit"
 )
 
 // renderDoctor is the exec-side wording. Only "fail" counts towards the exit
 // code here -- a warning is something to look at, not a broken setup -- and
 // the verdict text differs from the management side's on purpose.
 func TestRenderDoctorCountsOnlyFailures(t *testing.T) {
-	text, failures := renderDoctor("jumpserver-mcp-exec",
+	text, failures := renderDoctor("jumpserver-exec",
 		[]string{"bastion: 192.0.2.41:2222 as ai", "key:     /root/.ssh/id_rsa"},
 		[]doctorCheck{
 			{Status: "ok", Name: "key_file", Detail: "present, 3381 bytes"},
@@ -23,7 +23,7 @@ func TestRenderDoctorCountsOnlyFailures(t *testing.T) {
 		t.Errorf("failures = %d, want 0 (a warning must not fail the check)", failures)
 	}
 	for _, want := range []string{
-		"jumpserver-mcp-exec doctor",
+		"jumpserver-exec doctor",
 		"bastion: 192.0.2.41:2222 as ai",
 		"key:     /root/.ssh/id_rsa",
 		"[OK  ] key_file",
@@ -37,7 +37,7 @@ func TestRenderDoctorCountsOnlyFailures(t *testing.T) {
 }
 
 func TestRenderDoctorCountsFailures(t *testing.T) {
-	text, failures := renderDoctor("jumpserver-mcp-exec", []string{"bastion: x"},
+	text, failures := renderDoctor("jumpserver-exec", []string{"bastion: x"},
 		[]doctorCheck{
 			{Status: "fail", Name: "key_type", Detail: "not ssh-rsa"},
 			{Status: "fail", Name: "koko_port", Detail: "cannot reach"},
