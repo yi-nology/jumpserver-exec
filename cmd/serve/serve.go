@@ -13,6 +13,10 @@
 // ⚠️ 留痕接在这里，而不是接在入口层：留痕是「**谁在这台机器上做了什么**」
 // 的记录，只有**跑服务**那条路会调工具 ⇒ 「列工具目录」那种命令不该
 // 留下记录。
+//
+// ⚠️ 生命周期（socket、信号、优雅关闭）不在这里：那是两个服务共用的活，
+// 住在 kit 的 pkg/httpapi.Run。这里曾经有一份 startHTTP / serveHTTP 的
+// 拷贝，与管理面那份各自为政，日志措辞都漂了 —— 一份生命周期，两个服务。
 package serve
 
 import (
@@ -26,9 +30,13 @@ import (
 	"github.com/yi-nology/jumpserver-exec/biz/router"
 	"github.com/yi-nology/jumpserver-exec/internal/config"
 	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/httpapi"
 )
 
-// Run serves MCP over stdio until the transport closes.
+// Run serves MCP over stdio until the transport closes (`serve`), or runs
+// the HTTP face until SIGINT/SIGTERM (`serve http`). What is genuinely
+// this service's own is the wiring: the config, the client, the registry,
+// and the trail — the lifecycle around them is httpapi.Run's.
 //
 // ⚠️ 版本从入口层递进来：版本是**二进制的属性**，而版本常量住在仓根
 // （package main）⇒ 子命令拿不到它。
@@ -57,22 +65,22 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		// this is the plane where the commands actually run.
 		OnRecord: audit.Trail(cfg.Audit.Options(router.ServerName)),
 	})
-	if len(args) > 0 && args[0] == "http" {
-		return serveHTTP(ctx, cfg, r, version, stderr)
-	}
-	// stdio mode. The HTTP surface rides along when configured: one
-	// process serves both faces off the same registry, and the socket
-	// goes away with the session that owns the process.
-	if cfg.HTTPAddr != "" {
-		srv, err := startHTTP(cfg, r, version, stderr)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "jumpserver-exec: %v\n", err)
-			return cli.ExitError
-		}
-		defer srv.Close()
-	}
-	if err := r.Serve(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "jumpserver-exec: server failed: %v\n", err)
+
+	if err := httpapi.Run(ctx, r, httpapi.ServeOptions{
+		Options: httpapi.Options{
+			Token:    cfg.HTTPToken,
+			Name:     router.ServerName,
+			Version:  version,
+			ReadOnly: cfg.ReadOnly,
+		},
+		Addr:   cfg.HTTPAddr,
+		Stderr: stderr,
+		// This service's own documented example port
+		// (docs/CONFIGURATION.md): the shared refusal hint must not point
+		// at the other plane's port.
+		ExampleAddr: "127.0.0.1:8732",
+	}, args); err != nil {
+		fmt.Fprintf(stderr, "jumpserver-exec: %v\n", err)
 		return cli.ExitError
 	}
 	return cli.ExitOK

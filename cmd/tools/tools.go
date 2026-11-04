@@ -15,6 +15,7 @@ import (
 	"github.com/yi-nology/jumpserver-exec/internal/config"
 	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
 	"github.com/yi-nology/jumpserver-kit/pkg/httpapi"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // Run lists the tool catalogue: name, risk, and what it asks for.
@@ -58,16 +59,15 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		return cli.ExitOK
 	}
 
-	tbl := cli.NewTable()
-	for _, spec := range r.Specs() {
-		confirm := ""
-		if spec.Confirm != nil {
-			confirm = *spec.Confirm
-		} else if p, ok := policy.Table[spec.Name]; ok {
-			confirm = p.Hint
+	// The audit view of the catalogue. A CONDITIONAL confirmation has no
+	// sentence to refuse with, but the rule is still worth showing: the
+	// hint lookup is this service's own policy table (the risk side lives
+	// here, so the shared table renderer takes it as a callback).
+	reg.CatalogueTable(stdout, r.Specs(), func(name string) string {
+		if p, ok := policy.Table[name]; ok {
+			return p.Hint
 		}
-		tbl.Append(spec.Name, spec.Risk.String(), confirm)
-	}
-	tbl.Render(stdout)
+		return ""
+	})
 	return cli.ExitOK
 }

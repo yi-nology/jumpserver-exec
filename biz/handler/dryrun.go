@@ -17,16 +17,15 @@ import (
 // says the same way: what the command was classified as, whether it would
 // run, and — when it would not — what the caller has to do about it.
 //
-// They are computed in one place because they are computed for several
-// tools, and a tool that answered "would_execute" differently from its
-// neighbour would be worse than no answer at all.
+// The judgement and its sentence come from risk.Rehearsal, the ONE place
+// the "would this run?" question is answered for both planes: a tool that
+// answered it differently from its neighbour would be worse than no answer
+// at all, and the two planes used to spell the sentence each for itself.
+// This wrapper only adds the class name, which the answer shapes carry
+// alongside.
 func rehearsal(class jms.CommandClass, confirm bool) (riskClass string, would bool, blocked string) {
-	riskClass = class.String()
-	would = !risk.RequiresConfirmation(class) || confirm
-	if !would {
-		blocked = "classified " + riskClass + "; re-call with confirm=true to execute"
-	}
-	return riskClass, would, blocked
+	would, blocked = risk.Rehearsal(class, confirm)
+	return class.String(), would, blocked
 }
 
 // dryRunNote says what a rehearsal answer is, in one sentence.

@@ -46,8 +46,11 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		if args.DryRun {
 			return render.Text(dryRunCommand(args.Asset, args.Command, cmdClass, args.Confirm))
 		}
-		if risk.RequiresConfirmation(cmdClass) && !args.Confirm {
-			return render.Text(blockedCommand(args.Asset, args.Command, cmdClass.String()))
+		// The gate reads the SAME judgement the rehearsal above would report —
+		// `would` is false exactly when the command needs a confirmation and
+		// none was given.
+		if riskClass, would, blocked := rehearsal(cmdClass, args.Confirm); !would {
+			return render.Text(blockedCommand(args.Asset, args.Command, riskClass, blocked))
 		}
 		timeout := time.Duration(args.Timeout) * time.Second
 		if timeout <= 0 {

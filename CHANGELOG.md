@@ -11,6 +11,29 @@
 
 ### 修复
 
+## [0.7.0] - 2026-11-04
+
+### 变更
+
+- **列表样板收编到底座 `render.ListSpec`**（`jmsx_inventory` 的资产信封）：列表信封的
+  形状只有一份（filter → map → sort → truncate → count，`total` = 匹配数，截断才报
+  `truncated`）。
+- **演练收编**：「这命令会不会跑、缺什么」的判定与措辞收编到 `risk.Rehearsal`（两个面
+  唯一源）—— `blockedCommand` / `rehearsal` 不再各自拼那句话；本面措辞逐字不变。
+- **入口层收编**：`cmd/serve/http.go` 删除，serve 生命周期（listen / 后台 serve / 信号 /
+  5s 优雅关闭）交给底座 `httpapi.Run`；`cmd/tools` 的表格循环交给 `reg.CatalogueTable`；
+  `openapi_test.go` 缩为一次 `testsupport.CheckOpenAPI`（守卫身两仓一份）。
+- **日志措辞统一到共用生命周期**（行为变化）：stdio 失败行
+  `jumpserver-exec: server failed: …` → `jumpserver-exec: serve: …`；`serve http` 缺地址
+  的提示改为 `serve http needs an address to listen on — JMS_HTTP_ADDR, …`；HTTP 面
+  后台失败行不再带服务前缀（`http: …`）。
+- **底座升 `jumpserver-kit` v0.4.0**。
+
+### 修复
+
+- **`jmsx_inventory` 的计数口径**（收编时暴露）：`total` 原先报**未过滤**的行数（现在 =
+  匹配数）；`truncated` 原先「被过滤掉」即为真 —— 这个列表从不截断，现在恒 `false`。
+
 ## [0.6.0] - 2026-11-04
 
 ### 变更

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -39,36 +38,42 @@ func RegisterInventoryTools(r *reg.Registry, c *jmsapi.Client) {
 		if err != nil {
 			return render.Failf("%v", err)
 		}
-		out := []jms.AssetSummary{}
+		// decode first, filter → map → sort after: the envelope's three
+		// counting fields come from render.ListSpec, so this list answers
+		// "how many matched" the SAME way the management plane's
+		// jms_assets_list does — the two tools are one list seen from two
+		// sides, and this side used to report total as the UNFILTERED row
+		// count and truncated=true whenever a filter removed anything.
+		decoded := make([]map[string]any, 0, len(rows))
 		for _, r := range rows {
 			var a map[string]any
-			if json.Unmarshal(r, &a) != nil {
-				continue
+			if json.Unmarshal(r, &a) == nil {
+				decoded = append(decoded, a)
 			}
-			plat := fmt.Sprint(jmsapi.Nested(a, "platform", "name"))
-			name := fmt.Sprint(a["name"])
-			addr := fmt.Sprint(a["address"])
-			if args.Platform != "" && !strings.EqualFold(plat, args.Platform) {
-				continue
-			}
-			if args.Search != "" {
-				s := strings.ToLower(args.Search)
-				if !strings.Contains(strings.ToLower(name), s) && !strings.Contains(strings.ToLower(addr), s) {
-					continue
-				}
-			}
-			out = append(out, jmsapi.AssetSummary(a))
 		}
-		sort.Slice(out, func(i, j int) bool {
-			return out[i].GetAddress() < out[j].GetAddress()
-		})
-		return render.Text(render.ListOf[jms.AssetSummary]{
-			ListMeta: jms.ListMeta{
-				Count:     int32(len(out)),
-				Total:     int32(len(rows)),
-				Truncated: len(out) < len(rows),
+		return render.Text(render.ListSpec[map[string]any, jms.AssetSummary]{
+			Rows: decoded,
+			Keep: func(a map[string]any) bool {
+				if args.Platform != "" &&
+					!strings.EqualFold(fmt.Sprint(jmsapi.Nested(a, "platform", "name")), args.Platform) {
+					return false
+				}
+				if args.Search != "" {
+					s := strings.ToLower(args.Search)
+					name := strings.ToLower(fmt.Sprint(a["name"]))
+					addr := strings.ToLower(fmt.Sprint(a["address"]))
+					if !strings.Contains(name, s) && !strings.Contains(addr, s) {
+						return false
+					}
+				}
+				return true
 			},
-			Items: out,
-		})
+			Map: func(a map[string]any) jms.AssetSummary { return jmsapi.AssetSummary(a) },
+			Less: func(x, y jms.AssetSummary) bool {
+				return x.GetAddress() < y.GetAddress()
+			},
+			// No limit argument: the endpoint's page (page_size=500) is the
+			// only cap, so Max<=0 — nothing here truncates on its own.
+		}.Build())
 	})
 }

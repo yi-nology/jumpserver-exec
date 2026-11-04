@@ -113,7 +113,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			}
 			return render.Text(res)
 		}
-		if risk.RequiresConfirmation(cmdClass) && !args.Confirm {
+		if !would {
 			res.Risk = jms.Opt(riskClass)
 			res.Blocked = jms.Opt(blocked)
 			return render.Text(res)
@@ -467,7 +467,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			}
 			return render.Text(res)
 		}
-		if risk.RequiresConfirmation(class) && !args.Confirm {
+		if !would {
 			res.Risk = jms.Opt(riskClass)
 			res.Blocked = jms.Opt(blocked)
 			return render.Text(res)
@@ -532,8 +532,8 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			Asset:   jms.Opt(args.Asset),
 			Command: jms.Opt(args.Command),
 		}
-		riskClass, _, blocked := rehearsal(cmdClass, args.Confirm)
-		if risk.RequiresConfirmation(cmdClass) && !args.Confirm {
+		riskClass, would, blocked := rehearsal(cmdClass, args.Confirm)
+		if !would {
 			res.Risk = jms.Opt(riskClass)
 			res.Blocked = jms.Opt(blocked)
 			return render.Text(res)
@@ -670,7 +670,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			res.Plan = planSweep(ctx, cfg, args.Assets, len(args.Checks), concurrency, effectiveTimeout(args.Timeout))
 			return render.Text(res)
 		}
-		if risk.RequiresConfirmation(class) && !args.Confirm {
+		if !would {
 			res.Risk = jms.Opt(riskClass)
 			res.Blocked = jms.Opt(blocked)
 			res.Plan = planSweep(ctx, cfg, args.Assets, len(args.Checks), concurrency, effectiveTimeout(args.Timeout))
@@ -811,7 +811,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			res.Plan = planSweep(ctx, cfg, args.Assets, 1, concurrency, effectiveTimeout(args.Timeout))
 			return render.Text(res)
 		}
-		if risk.RequiresConfirmation(cmdClass) && !args.Confirm {
+		if !would {
 			res.Risk = jms.Opt(riskClass)
 			res.Blocked = jms.Opt(blocked)
 			res.Plan = planSweep(ctx, cfg, args.Assets, 1, concurrency, effectiveTimeout(args.Timeout))
