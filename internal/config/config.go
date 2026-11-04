@@ -319,6 +319,7 @@ func Load() (Config, error) {
 	}
 	return cfg, nil
 }
+
 // delegationOf attaches the delegation credential, when there is one.
 //
 // It is a separate function because the ORDER matters: the pool copies the

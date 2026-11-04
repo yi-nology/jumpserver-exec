@@ -528,15 +528,6 @@ func (k *Koko) pullRange(remotePath string, skip, count int64, timeout time.Dura
 
 // readEncoded runs the base64 read for one range and reassembles the marked rows.
 func (k *Koko) readEncoded(remotePath string, skip, count int64, timeout time.Duration) (string, error) {
-	// The "B64:" prefix is load-bearing in two ways. Exec re-bases every row with
-	// `sed s/^ *N/epoch-N/`, so base64 output that happens to begin with a digit
-	// would be rewritten into garbage. A leading letter cannot match that.
-	//
-	// The suffix problem is the mirror image: tmux packs neighbouring rows onto
-	// one physical row, so the trailing rc marker arrives glued directly onto
-	// the payload -- "aGVsbG8...=__JMSX_RC_..._0" -- and decoding that fails at
-	// the first non-base64 byte. base64 has a closed alphabet, so the payload is
-	// recovered by taking the first run of base64 characters.
 	// The encoding has to survive three separate manglings, each of which broke
 	// this in turn:
 	//

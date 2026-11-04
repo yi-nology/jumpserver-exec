@@ -2,12 +2,9 @@ package koko
 
 // What a session costs.
 //
-// Two numbers decide how long a fleet sweep takes: the cost of opening a
-// session and the cost of the commands inside it. Both are measured here
-// rather than assumed, because the estimate a caller is given before a
-// sweep is only as good as the number behind it.
-//
-// THREE numbers, not two, because there are three costs:
+// Three numbers decide how long a fleet sweep takes, and all three are
+// measured here rather than assumed, because the estimate a caller is
+// given before a sweep is only as good as the number behind it:
 //
 //   - opening a session FROM SCRATCH: a new connection, a new token, a new
 //     handshake. Every host in a sweep is a different asset and therefore a

@@ -642,7 +642,6 @@ func tokenUsername(id string) string {
 //
 // see sshx.Dial, where the reason the handshake needs its own bound is
 // spelled out (it lives in oekit/network/sshx now).
-// the reason the handshake needs its own bound is spelled out.
 func dialKoko(ctx context.Context, cfg Config, tok connectionToken, timeout time.Duration) (*ssh.Client, error) {
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	cc := &ssh.ClientConfig{
