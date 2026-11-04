@@ -42,9 +42,9 @@ package main
 
 // Version is the version of the execution-plane server.
 //
-// ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.4.2` 装出来的二进制
+// ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.4.4` 装出来的二进制
 // 要自己说对版本；说错的话，用户看 `--version` 会以为装错了版本。
-const Version = "0.4.2"
+const Version = "0.4.4"
 
 func main() {
 	dispatch()
