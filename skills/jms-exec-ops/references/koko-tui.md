@@ -54,7 +54,7 @@ Enter       → 接受账号，落到 shell 提示符
 
 | 东西 | 在哪 |
 |---|---|
-| 握手主流程 | `internal/exec/koko/koko.go` → `selectAsset` |
+| 握手主流程 | `internal/repository/koko/koko.go` → `selectAsset` |
 | 就绪判定 | `koko.go` → `waitForPanel`（认行计数器 + `enter:连接`） |
 | 打开搜索框 | `koko.go` → `openSearchBox`（带重试） |
 | 搜索生效判定 | `selectAsset` 里等 `x:清除搜索` |
@@ -74,5 +74,5 @@ sess.StdinPipe(); sess.StdoutPipe(); sess.Shell()
 // 读 10 秒，把带 ANSI 的原始内容打出来，再剥 ANSI 看结构
 ```
 
-仓库里 `internal/exec/koko/debug_probe.go.txt` 是当年的探针（不是构建的一部分），
+仓库里 `internal/repository/koko/debug_probe.go.txt` 是当年的探针（不是构建的一部分），
 可以照着改。

@@ -29,22 +29,44 @@
 **目录约定**（CloudWeGo hz 的标准骨架）：
 
 ```
-cmd/jumpserver-mcp-exec/    # 入口（package main）：serve / doctor / tools / version
-biz/exec/
+main.go / init.go / server.go / workers.go / shutdown.go
+                             # 入口层（**仓根**的 package main）：serve / doctor / tools / version
+cmd/                        # 子命令（入口层 import 的**普通包**，不是二进制）
+├── serve/                  #   默认命令：以 stdio 提供 MCP 服务
+├── doctor/                 #   自检：koko 接线
+└── tools/                  #   工具目录：名字、风险
+biz/
 ├── handler/                # 15 个工具的实现
 ├── model/jmsexec/          # 契约的生成物（thriftgo slim 模板，产物入库）
-├── policy/                 # 工具目录的**风险侧**：每个工具改不改机器、要不要确认
 └── router/                 # 装配：注册哪些工具
-conf/exec/                  # 配置（环境变量 → 结构体）
+internal/
+├── config/                 # 配置（环境变量 → 结构体）
+├── repository/koko/        # 数据访问层：koko TUI 协议 / 连接令牌 / 连接池 / 文件传输
+├── service/policy/         # 工具目录的**风险侧**：每个工具改不改机器、要不要确认
+├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
+├── middleware/             # （空）HTTP 中间件：这一面没有 HTTP
+└── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
 idl/jmsexec/                # 契约的 thrift 定义：入口 jmsexec.thrift + 按域拆的多份
-internal/exec/koko/         # koko TUI 协议 / 连接令牌 / 连接池 / 文件传输
-internal/arch/              # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
+pkg/                        # （空）通用库在 kit 仓，不在这里放东西
+etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+                             # （空）hz 骨架里的其余层：见各目录里的 README
 script/                     # 构建 / 发布 / 生成 / 校验
 skills/                     # 给 AI 的操作手册
 ```
 
+⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
+`go install github.com/yi-nology/jumpserver-mcp-exec@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mcp-exec@latest` —— 那个路径没有了）。
+
+⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
+而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
+main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
+
+⚠️ **空的层不是「忘了做」**：每一层都有自己的 README，写着它为什么空、
+什么时候不再是空的。
+
 hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTTP 路由，
-`biz/exec/router` 就是它们的对应物。
+`biz/router` 就是它们的对应物。
 
 **分层的方向是硬的，有守卫盯着**（判据在本仓 `internal/arch/`，守卫体在 kit 的 `pkg/arch`）：
 - **本仓不得 import 管理面**（另一个服务）；**底座不得依赖任何服务**。
@@ -66,7 +88,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
    （重试是安全的）；`maybe_sent` = **可能已经在机器上跑了**（**永不重放**）；
    **缺这一格 = 没人说**，不是「肯定没送到」。
    ⇒ 工具层要把带类型的错误**原样交上去**（`return fail(err)`，
-   `biz/exec/handler/fail.go`），别用 `render.Failf("%v", err)` 拍平 ——
+   `biz/handler/fail.go`），别用 `render.Failf("%v", err)` 拍平 ——
    拍平 ⇒ 投递状态没了 ⇒ 留痕只会说「它失败了」，不会说「它可能还在机器上跑着」。
    ⚠️ agent 看到的文字**一个字没变**（登记处把错误原样转成错误结果）。
    ⇒ **已投递绝不重放**这条规矩还管着连接池：同一连接一次只跑一条命令；
@@ -110,9 +132,9 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 10. **声明输出形状（`OutputSchema`），而且答案本身必须是契约类型。**
     服务端在返回前按 schema 校验，形状不对直接报错；机械守卫
-    （`internal/arch/answer_test.go`）盯着「不许手拼 map 的答案或行」。
+    （`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`）盯着「不许手拼 map 的答案或行」。
     ⚠️ **契约类型写了没人产出 = 契约不存在**
-    （`biz/exec/model/jmsexec/contract_test.go` 盯着）。
+    （`biz/model/jmsexec/contract_test.go` 盯着）。
 
 11. **底座改动会波及管理面** ⇒ **改底座前先发 kit 的 tag**，再更新两个服务仓的
     `require`。⚠️ **不许在本仓的 `go.mod` 里写 `replace`**（那会让 `go.mod`
@@ -124,11 +146,11 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
     发布路径、自检结果、以及「**需要重启会话才生效**」这句话。
 
 
-## 2. 执行面的实现要点（`biz/exec/`）
+## 2. 执行面的实现要点（`biz/`）
 
 ### 2.1 开会话有两条路
 
-（`internal/exec/koko/backend.go` 选）
+（`internal/repository/koko/backend.go` 选）
 - **连接令牌**（默认）：`POST /api/v1/authentication/connection-token/` 换一个一次性凭据，
   当 SSH 凭据直连 koko 2222（用户名 `JMS-{token id}`，密码是令牌的 value）。
   实测开会话 **0.7~0.9s**、单条命令 0.15~0.25s、**退出码是原生的**、输出不截断。
@@ -163,7 +185,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 ### 2.2 后端记忆
 
-（`internal/exec/koko/memory.go`）记住**哪个后端上次通了**（按堡垒机
+（`internal/repository/koko/memory.go`）记住**哪个后端上次通了**（按堡垒机
 一条，不是按资产 —— 令牌是每次现签的，koko 拒令牌登录就是拒所有）。
 - 它**只改尝试的顺序**（记忆说 TUI 通，就先试 TUI），**从不跳过一条路**，
   也**从不把资产问题变成兜底**。
@@ -176,7 +198,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 ### 2.3 自愈重选
 
-（`internal/exec/koko/token.go` 的 `degrade`）连接断了、重连又失败，
+（`internal/repository/koko/token.go` 的 `degrade`）连接断了、重连又失败，
 而失败是**机制**问题（令牌这条路不通了）⇒ 换 TUI 跑这条命令。
 ⚠️ **只在「命令没投递」这一支**（`errNotDelivered`）—— 换路执行是**第一次投递**，
 不是重放；「已投递绝不重放」那条规矩仍然成立。
@@ -187,7 +209,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTT
 
 ### 2.4 连接是池化的
 
-（`internal/exec/koko/pool.go`）令牌单次，但**会话活得比令牌久**
+（`internal/repository/koko/pool.go`）令牌单次，但**会话活得比令牌久**
 （实测 7 分钟），所以同一台机器的第二次调用几乎免费（1.04s → 0.26s）。
 ⚠️ 池里的连接**不出现在堡垒机的会话列表里**（实测：20 台 sweep 后仍是 0 条未结束会话 ——
 堡垒机记的是**每条命令的 exec 会话**，跑完就结束）；但资产上会留一个
@@ -213,7 +235,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 - ⚠️ **关连接必须先取连接的锁**：另一个会话可能正在这条连接上跑命令，
   裸 `client.Close()` 会把那条命令打断一半，而**已投递的命令不能重放**。
   （这条是 `pool_test.go` 里的并发测试抓出来的 —— 补丁没生效，测试当场抓住。）
-- `internal/exec/koko/transfer.go` 走 base64，传输后有大小校验（截断会显式失败，
+- `internal/repository/koko/transfer.go` 走 base64，传输后有大小校验（截断会显式失败，
   不会留半个文件）。下载支持 `offset`/`length` 在**远端**取段（`dd skip/count`），
   不必整文件拉回。
 - **`jmsx_relay`**：一台机器的文件直接传到另一台，字节从源端通道进目标端通道，
@@ -221,13 +243,13 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ### 2.7 koko TUI 协议（兜底路径）
 
-- 核心难点是 **koko TUI 协议**：`internal/exec/koko/koko.go` 负责握手和输出解析（兜底路径）。
+- 核心难点是 **koko TUI 协议**：`internal/repository/koko/koko.go` 负责握手和输出解析（兜底路径）。
 - ⚠️ **TUI 的屏幕缓存是原始字节流，不是渲染后的屏幕**：tmux 用转义序列移动光标、
   再把行写在落点，所以「状态栏」和「载荷行」会落在**同一条流**上（中间隔着转义
   序列）。编号行的匹配要求「列以数字开头」⇒ 粘在一起时整行被丢 ⇒ 答复里**只有
   退出码、没有输出**（实测 16 次里 1 次，新会话的首条命令）。
   ⇒ 编号行一定从**某个转义序列之后**开始（`lastNumberedStart`）；
-  真实抓到的屏幕固件在 `internal/exec/koko/testdata/tui-glued-row.txt`，
+  真实抓到的屏幕固件在 `internal/repository/koko/testdata/tui-glued-row.txt`，
   回归测试在 `glued_row_test.go`。
 - ⚠️ **koko 的界面文案会变**，就绪信号、搜索触发方式、否定文案都在变。
   当前流程见 `koko.go` 里的 `panelHint`/`searchOpen`/`searchClear`
@@ -240,11 +262,11 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 - ⚠️ **超时必须真的有界**：命令超时后要再给传输一点时间收尾，但**不能无限等** ——
   传输卡死时会把连接的锁一直占着，同一台机器上的其他会话全被连累，而且它们
   自己的超时根本轮不到开始。连接的锁因此是可带截止时间等待的（`connLock`）。
-- 池的并发护栏在 `internal/exec/koko/pool_test.go`，**构建脚本每次都跑 `-race`**。
+- 池的并发护栏在 `internal/repository/koko/pool_test.go`，**构建脚本每次都跑 `-race`**。
 
 ### 2.8 成本有三个数，不是两个
 
-（`internal/exec/koko/cost.go`）**冷开**（新建连接）、**池命中**（复用已有连接）、
+（`internal/repository/koko/cost.go`）**冷开**（新建连接）、**池命中**（复用已有连接）、
 **一条命令**。sweep 每台机器都是冷开，所以计划用冷开价；
 重复调用同一台机器才是池命中价。样本**按后端打标签**（令牌 ~1s vs 终端 ~8s，
 混在一起的中位数两边都不属于）。计划**会去查池**并报出 `pooled_hosts` ——
@@ -253,7 +275,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 ### 2.9 执行面没有自己的 REST 客户端
 
 - 资产清单走的是 kit 的 `pkg/jmsapi`，跟管理面同一份实现。
-  配置在 `conf/exec` 的 `Config.API`（`JUMPSERVER_URL` / `JUMPSERVER_TOKEN` /
+  配置在 `internal/config` 的 `Config.API`（`JUMPSERVER_URL` / `JUMPSERVER_TOKEN` /
   `JUMPSERVER_TIMEOUT` / 限流），**别再在代码里 `os.Getenv` 或硬编码堡垒机地址**。
   没有 token 时 `Config.APIClient()` 返回 nil：`jmsx_inventory` 停用，令牌后端也停用
   （于是走 TUI 兜底）。
@@ -264,7 +286,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 ### 2.10 输出形状全部是契约类型
 
 - ⚠️ **执行面 15 个工具的输出形状全部是契约类型**（`idl/jmsexec/`），
-  `render.Object` 一个不剩（`biz/exec/handler/contract_test.go` 盯着）。
+  `render.Object` 一个不剩（`biz/handler/contract_test.go` 盯着）。
   契约类型由工具**直接产出**，不是现拼的 map —— 所以键名写错编译期就红。
 - 契约词汇：`SessionStats`（会话的账：握手多久、省了多少）、
   `SweepPlan`（一次批量作业的估算：几轮、多久、并发拉满能省多少）、
@@ -285,7 +307,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
   会不会执行」。
 - **多机的两个工具**（`jmsx_collect_multi` / `jmsx_exec_multi`）的演练答复里还带一个
   `plan`：**几轮**（轮数）、**大概多久**（秒数区间）、并发拉满能省多少。
-  底数来自 `internal/exec/koko/cost.go`：**握手与单命令耗时是实测的**（`koko.Open` 计时，
+  底数来自 `internal/repository/koko/cost.go`：**握手与单命令耗时是实测的**（`koko.Open` 计时，
   取中位数），没量过时用文档默认值并标出来。
   ⚠️ 演练**不开会话**，所以 `plan` 是按已测成本推算，不是「跑过了」。
 
@@ -296,7 +318,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 ## 3. 执行面专属铁律
 
 1. **工具数是 15，**没有 REST 凭据时**是 14**。
-   `biz/exec/policy/policy_test.go` 断言的是**名字集合**而不是一个数字：
+   `internal/service/policy/policy_test.go` 断言的是**名字集合**而不是一个数字：
    14 个工具是固定的（`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
    `jmsx_exec_multi` / `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_put_file` /
    `jmsx_get_file` / `jmsx_relay` / `jmsx_reachable` / `jmsx_session_cost` /
@@ -352,11 +374,11 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 |---|---|
 | 编译 | `./script/build.sh` 无错（产物落在 `./bin/jumpserver-mcp-exec`） |
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
-| 竞态 | 池的并发护栏在 `internal/exec/koko/pool_test.go` ⇒ **必须带 `-race` 跑** |
+| 竞态 | 池的并发护栏在 `internal/repository/koko/pool_test.go` ⇒ **必须带 `-race` 跑** |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
-| 工具数 | **15**（无 REST 凭据时 **14**）—— `biz/exec/policy/policy_test.go` 钉住这个**集合** |
+| 工具数 | **15**（无 REST 凭据时 **14**）—— `internal/service/policy/policy_test.go` 钉住这个**集合** |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
-| 契约 | 契约类型必须真被产出（`biz/exec/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/answer_test.go`） |
+| 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
 | 自检 | `./bin/jumpserver-mcp-exec --doctor` 退出码 0（查密钥类型 / 端口 / 真实 koko 登录） |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
@@ -406,7 +428,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 怎么参与：跑测试、加工具的规矩、提交约定 |
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告渠道、凭据处理纪律 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 变更记录（Keep a Changelog） |
-| [`biz/exec/README.md`](biz/exec/README.md) | 执行面细节 |
+| [`biz/README.md`](biz/README.md) | 执行面细节 |
 | [`skills/`](skills/) | **给 AI 的操作手册**（jms-exec-ops） |
 | **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
 | **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |

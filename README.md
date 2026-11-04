@@ -40,7 +40,7 @@ PrivateToken 在堡垒机上拿：v5 是 `设置 → API 授权`，v4 是 `用�
 
 ```bash
 # 方式一：go install（需要 Go 1.26+）
-go install github.com/yi-nology/jumpserver-mcp-exec/cmd/jumpserver-mcp-exec@latest
+go install github.com/yi-nology/jumpserver-mcp-exec@latest
 
 # 方式二：release 二进制（见 Releases 页）
 curl -LO https://github.com/yi-nology/jumpserver-mcp-exec/releases/latest/download/jumpserver-mcp-exec-linux-amd64
@@ -119,7 +119,7 @@ jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
 | **留痕** | 每次调用一行：调了什么工具、参数是什么、门禁每一段的判定与理由、放行与否、耗时。**被拦下的调用根本没到堡垒机**（堡垒机没有会话可查），所以只有这里查得到 | `pkg/audit`，落盘 JSONL |
 | **脱敏** | 参数、错误、拒绝理由里的凭据按**同一份词表**遮蔽，两个出口（答复 / 留痕）逐字节一致 | `pkg/redact` |
 | **只读模式** | `JMS_READ_ONLY=true` ⇒ 一切会改东西的工具直接拒绝 | 管理面与执行面都支持 |
-| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试 | `biz/exec/handler` |
+| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试 | `biz/handler` |
 
 > 上面三个 `pkg/*` 现在住在
 > [`jumpserver-mcp-kit`](https://github.com/yi-nology/jumpserver-mcp-kit) —— 它们是两个服务
@@ -144,23 +144,45 @@ jumpserver-mcp-exec --doctor   # 接线 + 真实 koko 登录验证
 
 ```
 .
-├── cmd/jumpserver-mcp-exec/    ← 编译入口（serve / doctor / tools / version）
-├── biz/exec/                   ← 业务
+├── main.go / init.go / server.go / workers.go / shutdown.go
+│                                ← 入口层（**仓根**的 package main）：serve / doctor / tools / version
+├── cmd/                        ← 子命令（入口层 import 的**普通包**，不是二进制）
+│   ├── serve/                  ← 默认命令：以 stdio 提供 MCP 服务
+│   ├── doctor/                 ← 自检：koko 接线
+│   └── tools/                  ← 工具目录：名字、风险
+├── biz/                        ← 业务
 │   ├── handler/                ← 15 个工具的实现
 │   ├── model/jmsexec/          ← 输出契约的生成物（thriftgo，产物入库）
-│   ├── policy/                 ← 工具目录的风险侧：要不要 confirm
 │   └── router/                 ← 装配：注册哪些工具
-├── conf/exec/                  ← 配置（koko 接线 + REST 端点）
+├── internal/                   ← 模块私有
+│   ├── config/                 ← 配置（koko 接线 + REST 端点）
+│   ├── repository/koko/        ← 数据访问层：koko TUI 协议握手与输出解析 + 文件传输
+│   ├── service/policy/         ← 工具目录的风险侧：要不要 confirm
+│   ├── arch/                   ← 机械守卫（见下）
+│   ├── middleware/             ← （空）HTTP 中间件：这一面没有 HTTP
+│   └── rpchandler/             ← （空）RPC 服务端：这一面不对外提供 RPC
 ├── idl/jmsexec/                ← 输出契约的 thrift 定义
-├── internal/exec/koko/         ← koko TUI 协议握手与输出解析 + 文件传输
-├── internal/arch/              ← 机械守卫（见下）
+├── pkg/                        ← （空）通用库在 kit 仓，不在这里放东西
+├── etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+│                                ← （空）hz 骨架里的其余层：见各目录里的 README
 ├── script/                     ← 构建 / 发布脚本
 ├── skills/jms-exec-ops/        ← 给 AI agent 的操作手册
 ├── docs/                       ← 配置与排障
 └── AGENTS.md                   ← 给 AI 的迭代指南（改代码前先读）
 ```
 
-目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `model/` `conf/` `script/`）。
+目录按 **CloudWeGo hz 的标准骨架**摆（`cmd/` `biz/` `idl/` `internal/` `pkg/` `etc/` `script/`）。
+
+⚠️ **入口层在仓根**：一个仓一个二进制，二进制就是仓根那个 `package main` ⇒
+`go install github.com/yi-nology/jumpserver-mcp-exec@latest` 装出来的就是它
+（**不是** `…/cmd/jumpserver-mcp-exec@latest` —— 那个路径没有了）。
+
+⚠️ **`cmd/` 里是子命令，不是二进制**：那些包是入口层 import 的普通包。
+而**实现不住在仓根** —— 仓根那个 package 是 `main`，Go **不许 import 一个
+main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
+
+⚠️ **空的层不是「忘了做」**：每一层都有自己的 README，写着它为什么空、
+什么时候不再是空的。
 
 ### 6.1 为什么底座不在本仓
 

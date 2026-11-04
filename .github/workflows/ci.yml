@@ -154,4 +154,4 @@ jobs:
         # CGO 与 release/Dockerfile 保持一致(go.mod 用纯 Go sqlite)
         env:
           CGO_ENABLED: '0'
-        run: go build -o ./bin/jumpserver-mcp-exec ./cmd/jumpserver-mcp-exec
+        run: go build -o ./bin/jumpserver-mcp-exec .

@@ -45,7 +45,7 @@ cd "$ROOT"
 
 echo "==> 编译 $BIN_NAME"
 mkdir -p "$BIN_DIR"
-go build -o "$BIN_DIR/$BIN_NAME" "./cmd/$BIN_NAME"
+go build -o "$BIN_DIR/$BIN_NAME" "."
 echo "    产物：$BIN_DIR/$BIN_NAME"
 
 if [ "$RUN_TESTS" -eq 1 ]; then

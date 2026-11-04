@@ -63,17 +63,17 @@ python3 script/publish-mcp.py
 
 见 [`../AGENTS.md`](../AGENTS.md) §3（底座那一份写着「在服务仓里怎么加」）。要点：
 
-1. **先想清楚代码落在哪一层** —— 工具本身 → `biz/exec/handler/`；
-   koko TUI 协议 / 会话 / 池 / 传输 → `internal/exec/koko/`；
+1. **先想清楚代码落在哪一层** —— 工具本身 → `biz/handler/`；
+   koko TUI 协议 / 会话 / 池 / 传输 → `internal/repository/koko/`；
    资产清单与 REST → **kit 仓的 `pkg/jmsapi/`**（**别在别处再写一份**）；
 2. **用 `reg.Add` 注册**，不要用 `mcp.AddTool`（后者绕过门禁）；
 3. **声明输出形状**（`OutputSchema`）—— 服务端返回前会按它校验，形状不对直接报错；
 4. **答案必须是契约类型**，不许现拼 map；
-5. **在 `biz/exec/policy/policy.go` 里分类**（只读 / 写 / 不可逆 / 条件确认）；
+5. **在 `internal/service/policy/policy.go` 里分类**（只读 / 写 / 不可逆 / 条件确认）；
 6. **工具描述要写「什么时候用这个工具」**，不是「这个工具做什么」——
    那是 AI 选工具的唯一依据；
 7. **同步改 `skills/`** —— 那里是 agent 选工具的依据；
-8. **改工具数**（15 → 16）—— 被 `biz/exec/policy/policy_test.go` 钉住
+8. **改工具数**（15 → 16）—— 被 `internal/service/policy/policy_test.go` 钉住
    （⚠️ 没有 REST 凭据时那个数是 14）。
 
 ⚠️ **动了会话层就要想清楚投递状态**：改「命令怎么发出去」或「失败怎么分类」时，
@@ -86,13 +86,13 @@ python3 script/publish-mcp.py
 |---|---|
 | 编译 | `./script/build.sh` 无错 |
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿 |
-| 竞态 | **必须带 `-race` 跑一遍**（连接池的并发护栏在 `internal/exec/koko/pool_test.go`） |
+| 竞态 | **必须带 `-race` 跑一遍**（连接池的并发护栏在 `internal/repository/koko/pool_test.go`） |
 | 格式化 | `gofmt -l .` 无输出 |
 | 静态检查 | `go vet ./...` 无错 |
 | 启动 | `./script/bootstrap.sh` 能起进程；`script/verify-mcp-launch.py` 报 `OK ... N tools` |
-| 工具数 | **15**（无 REST 凭据时 **14**）—— `biz/exec/policy/policy_test.go` 钉住这个**集合** |
+| 工具数 | **15**（无 REST 凭据时 **14**）—— `internal/service/policy/policy_test.go` 钉住这个**集合** |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
-| 契约 | 契约类型必须真被产出（`biz/exec/model/jmsexec/contract_test.go`）；答案本身必须是契约类型 |
+| 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；答案本身必须是契约类型 |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
 | 自检 | `./bin/jumpserver-mcp-exec --doctor` 退出码 0 |
 | 真调 | 改了输出形状一定要**真调一次**（读工具对真堡垒机，写工具对假堡垒机）—— schema 校验只在答案被返回时才跑 |
