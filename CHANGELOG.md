@@ -39,6 +39,8 @@
 
 - ⚠️ **底座要求抬到 `jumpserver-mcp-kit v0.1.4`**：入口层的新布局要底座
   的守卫认（新判据 + 新增的「一个仓一个二进制」守卫）。
+- 版本号 0.3.3 → 0.4.0（目录重排是**破坏性**改动 ⇒ 抬 minor；
+  旧 tag 不可移动，所以只能往前发）。
 - 内部包名跟着改：`conf` → `config`（`config.Config`）；
   koko 那层包名不变（`koko`），只是搬到了 `internal/repository/koko/`。
 
