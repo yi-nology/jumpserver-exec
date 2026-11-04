@@ -428,7 +428,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 怎么参与：跑测试、加工具的规矩、提交约定 |
 | [`SECURITY.md`](SECURITY.md) | 漏洞报告渠道、凭据处理纪律 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 变更记录（Keep a Changelog） |
-| [`biz/README.md`](biz/README.md) | 执行面细节 |
+| [`docs/KOKO-NOTES.md`](docs/KOKO-NOTES.md) | 执行面细节 |
 | [`skills/`](skills/) | **给 AI 的操作手册**（jms-exec-ops） |
 | **kit 仓的 AGENTS.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/AGENTS.md> —— **共享纪律**（铁律、底座怎么发版、跨仓守卫） |
 | **kit 仓的 ARCHITECTURE.md** | <https://github.com/yi-nology/jumpserver-mcp-kit/blob/main/docs/ARCHITECTURE.md> —— 三仓的边界与依赖方向 |
