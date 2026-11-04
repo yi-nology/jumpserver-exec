@@ -11,6 +11,38 @@
 
 ### 修复
 
+## [0.6.0] - 2026-11-04
+
+### 变更
+
+### 新增
+
+- **HTTP API 面（REST + MCP over streamable HTTP）**：同一份工具目录的第二个面，
+  与 stdio **共用同一个注册表** ⇒ 同一道风险门禁、同一套确认语义、同一份留痕
+  （HTTP 面不是后门：stdio 拒的，这里一样拒）：
+  - 路由：`GET /api/v1/health`（**唯一**免认证，只报名字 / 版本 / 只读与否 / 工具数）、
+    `GET /api/v1/tools`（目录：风险、确认要求、入参 / 出参形状）、
+    `POST /api/v1/tools/{name}/invoke`、`/mcp`（MCP over streamable HTTP）。
+  - 认证：Bearer 令牌（`JMS_HTTP_TOKEN`，常量时间比较）；**没有「不开认证」模式**
+    （`JMS_HTTP_ADDR` 有、`JMS_HTTP_TOKEN` 无 ⇒ 启动即拒）。
+  - **结果的读法与 stdio 逐字相同**：拒绝、失败、入参不合形状一律 HTTP 200 +
+    `is_error=true`；请求本身坏才 400，没有这个工具才 404。
+  - 两种跑法：`serve`（默认，stdio）配了 `JMS_HTTP_ADDR` **顺带**开 HTTP；
+    `serve http` 只开 HTTP，长跑到信号（当服务部署用这个）。
+  - 留痕的 `client` 列记 **`rest`**（HTTP 面认证的是令牌不是人，不记「alice」）。
+- **OpenAPI 契约**：`swagger/openapi.json` 由 `tools openapi` 生成
+  （`./script/gen-openapi.sh`，产物入库，生成不需要任何秘密），与 MCP 工具目录**同源**
+  （入参 = Go 类型派生，出参 = `idl/` 契约生成物）。⚠️ 契约文档**恒渲染完整 15 个工具**
+  （`router.NewContract` 桩 client）—— `jmsx_inventory` 注册与否看 REST 凭据，
+  而签入的契约不能随生成机器的环境变（`tools` 列表的行为不变，仍按实际注册数）。
+  守卫 `openapi_test.go` 拿签入的文档与再生成的**逐字节**比对（含版本号）；
+  「这道守卫会红」由 `script/mutate-swagger-guard.py` 机械证明（对照 + canary + 4 条变异全红）。
+- 新环境变量 `JMS_HTTP_ADDR` / `JMS_HTTP_TOKEN`（见 docs/CONFIGURATION.md §3.9）。
+- **底座升 `jumpserver-kit` v0.3.0**：`pkg/httpapi`（REST + MCP over HTTP，两面共用
+  同一注册表）、`pkg/reg` 的 schema 捕获与 `CallTool` / `StreamableHTTPHandler`。
+
+### 修复
+
 ## [0.5.0] - 2026-11-04
 
 ### ⚠️ 更名（breaking）

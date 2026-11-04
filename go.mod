@@ -12,7 +12,7 @@ module github.com/yi-nology/jumpserver-exec
 go 1.26.0
 
 require (
-	github.com/yi-nology/jumpserver-kit v0.2.0
+	github.com/yi-nology/jumpserver-kit v0.3.0
 
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0

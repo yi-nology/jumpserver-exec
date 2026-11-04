@@ -62,7 +62,7 @@ MODULES=(
   "golang.org/x/sync@v0.22.0"
   "golang.org/x/sys@v0.49.0"
   "mvdan.cc/sh/v3@v3.14.1"
-  "github.com/yi-nology/jumpserver-kit@v0.2.0"
+  "github.com/yi-nology/jumpserver-kit@v0.3.0"
 )
 
 # in_workspace 判断某个模块是不是由**本地工作集**（go.work）提供的。

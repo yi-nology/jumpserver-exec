@@ -14,6 +14,7 @@ import (
 	"github.com/yi-nology/jumpserver-exec/biz/router"
 	"github.com/yi-nology/jumpserver-exec/internal/config"
 	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
+	"github.com/yi-nology/jumpserver-kit/pkg/httpapi"
 )
 
 // Run lists the tool catalogue: name, risk, and what it asks for.
@@ -34,6 +35,29 @@ func Run(ctx context.Context, version string, args []string, stdout, stderr io.W
 		cfg = config.Config{}
 	}
 	r := router.New(cfg, cfg.APIClient(), version, router.Options{})
+
+	// `tools openapi` renders the HTTP surface's OpenAPI document. The
+	// checked-in copy under swagger/ is generated through this exact code
+	// path (script/gen-openapi.sh) — so the document and the tools cannot
+	// drift apart, and the service's own guard compares them.
+	//
+	// ⚠️ It renders from router.NewContract, not from the registry above:
+	// `jmsx_inventory` only registers when a REST client is configured, and
+	// a checked-in contract must not be a function of the machine that
+	// generated it.
+	if len(args) > 0 && args[0] == "openapi" {
+		doc, err := httpapi.OpenAPI(router.NewContract(version), httpapi.Options{Name: router.ServerName, Version: version, ReadOnly: cfg.ReadOnly})
+		if err != nil {
+			fmt.Fprintf(stderr, "FATAL  %v\n", err)
+			return cli.ExitError
+		}
+		if _, err := stdout.Write(doc); err != nil {
+			fmt.Fprintf(stderr, "FATAL  %v\n", err)
+			return cli.ExitError
+		}
+		return cli.ExitOK
+	}
+
 	tbl := cli.NewTable()
 	for _, spec := range r.Specs() {
 		confirm := ""

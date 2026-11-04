@@ -52,6 +52,19 @@ func New(cfg config.Config, c *jmsapi.Client, version string, opts Options) *reg
 	return r
 }
 
+// NewContract assembles the FULL catalogue for contract documents
+// (swagger/openapi.json).
+//
+// ⚠️ 为什么不用 New(cfg, cfg.APIClient(), …)：`jmsx_inventory` 只在有 REST
+// client 时才注册，而**签入的契约文档不能随生成它的机器变** —— 有凭据的
+// 机器生成 15 个工具、没凭据的生成 14 个，文档就成了环境的函数。⇒ 文档永远
+// 按完整目录（15 个工具）渲染。桩 client 只为让注册看到与部署相同的形状，
+// 它永远不会被调用。
+func NewContract(version string) *reg.Registry {
+	cfg := config.Config{API: config.APIConfig{BaseURL: "http://127.0.0.1:1", Token: "contract-doc"}}
+	return New(cfg, cfg.APIClient(), version, Options{})
+}
+
 // implementation says who this server is.
 func implementation(version string) *mcp.Implementation {
 	return &mcp.Implementation{Name: ServerName, Version: version}

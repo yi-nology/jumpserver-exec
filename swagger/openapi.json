@@ -1,0 +1,3750 @@
+{
+  "components": {
+    "schemas": {
+      "Error": {
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "InvokeResult": {
+        "properties": {
+          "is_error": {
+            "type": "boolean"
+          },
+          "structured": {},
+          "text": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "is_error",
+          "text"
+        ],
+        "type": "object"
+      },
+      "ToolInput_jmsx_audit_query": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "only the lines written by this server, e.g. jumpserver-exec or jumpserver-mgmt"
+          },
+          "tool": {
+            "type": "string",
+            "description": "only the lines of this tool, e.g. jmsx_exec"
+          },
+          "client": {
+            "type": "string",
+            "description": "only the lines of this MCP client, e.g. the agent host's name"
+          },
+          "allowed": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "true keeps the calls that were NOT refused (a failure counts as not refused — look at failed for those), false keeps the ones that were refused, rehearsed or stopped at the gate"
+          },
+          "refused": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "true keeps the calls a TOOL refused, false keeps the rest. A gate-level refusal (the call never reached the tool) and a rehearsal are not refusals"
+          },
+          "failed": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "true keeps the calls whose WORK failed (the tool answered with an error), false keeps the rest. A call the gate stopped is NOT a failure: the gate working is not something broken"
+          },
+          "delivery": {
+            "type": "string",
+            "description": "only the lines with this delivery state: not_sent (it never left this process) or maybe_sent (it may ALREADY be running on the machine)"
+          },
+          "since": {
+            "type": "string",
+            "description": "only the lines at or after this moment, e.g. 2026-10-28 or 2026-10-28T09:00:00"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "how many lines to return at most (default 50, at most 500)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_bg_check": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "path": {
+            "type": "string",
+            "description": "the output path returned by jmsx_bg_start"
+          }
+        },
+        "required": [
+          "asset",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_bg_start": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "command": {
+            "type": "string",
+            "description": "the long-running command to start"
+          },
+          "path": {
+            "type": "string",
+            "description": "where to write the output on the asset; defaults to a file under /tmp"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when the command is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). A harmless command does not need it"
+          }
+        },
+        "required": [
+          "asset",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_collect": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "label for this fact, e.g. 'disk'"
+                },
+                "command": {
+                  "type": "string",
+                  "description": "the command that produces it"
+                }
+              },
+              "required": [
+                "name",
+                "command"
+              ],
+              "additionalProperties": false
+            },
+            "description": "the facts to collect, each with a name you will recognise later"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per command (default 60)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "classify the commands and report whether they would run, WITHOUT running them (no session, no side effect)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when one of the commands is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). Harmless commands do not need it"
+          }
+        },
+        "required": [
+          "asset",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_collect_multi": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "asset names or addresses to sweep"
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "label for this fact, e.g. 'disk'"
+                },
+                "command": {
+                  "type": "string",
+                  "description": "the command that produces it"
+                }
+              },
+              "required": [
+                "name",
+                "command"
+              ],
+              "additionalProperties": false
+            },
+            "description": "the same facts to collect on every asset"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per command (default 60)"
+          },
+          "concurrency": {
+            "type": "integer",
+            "description": "how many hosts to sweep at once (default 4, max 8)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "classify the commands and report whether they would run, WITHOUT running them (no session, no side effect)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when one of the commands is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). Harmless commands do not need it"
+          }
+        },
+        "required": [
+          "assets",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_exec": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name, address or partial name as shown in JumpServer, e.g. node-071 or 192.0.2.71"
+          },
+          "command": {
+            "type": "string",
+            "description": "shell command to run on the asset; runs as the asset account, NOT root -- use sudo -n yourself if root is needed"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds to wait (default 60, max 600)"
+          },
+          "full": {
+            "type": "boolean",
+            "description": "fetch the COMPLETE output even when it exceeds the terminal window (slower: costs extra round trips)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "classify the command and report whether it would run, WITHOUT running it (no session, no side effect)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when the command is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). A harmless command does not need it"
+          }
+        },
+        "required": [
+          "asset",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_exec_multi": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "asset names or addresses to run the command on"
+          },
+          "command": {
+            "type": "string",
+            "description": "the shell command to run on every asset"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds allowed per asset (default 60)"
+          },
+          "stop_on_error": {
+            "type": "boolean",
+            "description": "stop handing out further assets after the first failure instead of trying the rest"
+          },
+          "concurrency": {
+            "type": "integer",
+            "description": "how many hosts to run on at once (default 4, max 8). Every host gets its own bastion session, so this is what makes a fleet sweep fast."
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "classify the command, report what the sweep would cost (rounds, estimated seconds) and whether it would run, WITHOUT running it (no session, no side effect)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when the command is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). A harmless command does not need it"
+          }
+        },
+        "required": [
+          "assets",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_get_file": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "remote_path": {
+            "type": "string",
+            "description": "file on the asset to read"
+          },
+          "local_path": {
+            "type": "string",
+            "description": "write the content to this local path"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "byte offset in the file to start reading from (default 0)"
+          },
+          "length": {
+            "type": "integer",
+            "description": "how many bytes to read from that offset; 0 (the default) means to the end of the file"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds (default 60)"
+          }
+        },
+        "required": [
+          "asset",
+          "remote_path"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_inventory": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "description": "filter by platform, e.g. Linux, Gateway, Kubernetes"
+          },
+          "search": {
+            "type": "string",
+            "description": "substring match on name or address"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_pool_status": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_put_file": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "local_path": {
+            "type": "string",
+            "description": "file on this machine to upload; use instead of content when the file already exists locally"
+          },
+          "content": {
+            "type": "string",
+            "description": "the file content to upload, given inline. Use this when the content is already in hand (a generated script, a config fragment) so no temp file is needed."
+          },
+          "content_base64": {
+            "type": "string",
+            "description": "same as content, but base64-encoded; use for binary payloads"
+          },
+          "remote_path": {
+            "type": "string",
+            "description": "destination path on the asset"
+          },
+          "mode": {
+            "type": "string",
+            "description": "chmod mode for the remote file, e.g. 700 for a script"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per internal step (default 60)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true; this writes a file on the machine, overwriting what is there"
+          }
+        },
+        "required": [
+          "asset",
+          "remote_path",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_reachable": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address to test"
+          }
+        },
+        "required": [
+          "asset"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_relay": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "source asset name or address, e.g. node-071 or 192.0.2.71"
+          },
+          "source_path": {
+            "type": "string",
+            "description": "path of the file on the source machine, e.g. /opt/app/config.yml"
+          },
+          "destination": {
+            "type": "string",
+            "description": "destination asset name or address"
+          },
+          "destination_path": {
+            "type": "string",
+            "description": "path to write the file to on the destination machine"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds to wait (default 120)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true: this writes a file on the destination machine"
+          }
+        },
+        "required": [
+          "source",
+          "source_path",
+          "destination",
+          "destination_path",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_run": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address, e.g. node-071"
+          },
+          "commands": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "commands to run in order on the same shell; far cheaper than one call per command"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds allowed per command (default 60)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "classify the commands and report whether they would run, WITHOUT running them (no session, no side effect)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when any of the commands is classified DANGEROUS (rm -rf, reboot, mkfs, privilege changes). Harmless commands do not need it"
+          }
+        },
+        "required": [
+          "asset",
+          "commands"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_session_cost": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          }
+        },
+        "required": [
+          "asset"
+        ],
+        "additionalProperties": false
+      },
+      "ToolOutput_jmsx_audit_query": {
+        "type": "object",
+        "properties": {
+          "trail_dir": {
+            "type": "string"
+          },
+          "entries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "ts": {
+                  "type": "string"
+                },
+                "service": {
+                  "type": "string"
+                },
+                "tool": {
+                  "type": "string"
+                },
+                "client": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "args": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "allowed": {
+                  "type": "boolean"
+                },
+                "stages": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "stage": {
+                        "type": "string"
+                      },
+                      "allow": {
+                        "type": "boolean"
+                      },
+                      "reason": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "stage",
+                      "allow"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "duration_ms": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "out_bytes": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "refused": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "dry_run": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "would_execute": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "failed": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "delivery": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "required": [
+                "ts",
+                "service",
+                "tool",
+                "allowed"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "count": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "total": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "truncated": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "skipped": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "trail_dir"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_bg_check": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exit_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "next": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_bg_start": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "command": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "output_path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exit_marker": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "next": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_collect": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "command": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "command": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "output": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "partial": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "delivery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "asset"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_collect_multi": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "checks": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "command": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "matrix": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "asset": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "facts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "null",
+                      "object"
+                    ],
+                    "properties": {
+                      "command": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "output": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "ok": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "delivery": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "ok": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "failed": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "concurrency": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "hosts": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "sessions": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "commands_per_host": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "concurrency": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "rounds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "seconds_per_host": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "estimate_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "min_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "max_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "estimate": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "measure_with": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "basis": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "caveat": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "walk_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "command_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "at_max_concurrency": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "concurrency": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "rounds": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "estimate_seconds": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "estimate": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                },
+                "additionalProperties": true
+              },
+              "pooled_hosts": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "pooled_walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "pooled_walk_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "delivery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_exec": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "output": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "warning": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "output_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "full_output_error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reused": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "account": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "command",
+          "exit_code",
+          "output",
+          "via"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_exec_multi": {
+        "type": "object",
+        "properties": {
+          "assets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "command": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hosted": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "ok": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "failed": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "skipped": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "concurrency": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "results": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "asset": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "ok": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "exit_code": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "output": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "truncated": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "warning": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "skipped": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "reused": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "delivery": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "plan": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "hosts": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "sessions": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "commands_per_host": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "concurrency": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "rounds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "seconds_per_host": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "estimate_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "min_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "max_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "estimate": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "measure_with": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "basis": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "caveat": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "walk_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "command_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "at_max_concurrency": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "properties": {
+                  "concurrency": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "rounds": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                  },
+                  "estimate_seconds": {
+                    "type": [
+                      "null",
+                      "number"
+                    ]
+                  },
+                  "estimate": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                },
+                "additionalProperties": true
+              },
+              "pooled_hosts": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "pooled_walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "pooled_walk_source": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "delivery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_get_file": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "remote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "local": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bytes_returned": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "available_bytes": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "offset": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "length": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "truncated": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "local_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "remote_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checksum_match": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "content": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "warning": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_inventory": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                },
+                "accounts": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
+                },
+                "platform": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "category": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "connectivity": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "is_active": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ]
+                },
+                "protocols": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "address"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "total",
+          "truncated",
+          "items"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_pool_status": {
+        "type": "object",
+        "properties": {
+          "connections": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "idle_ttl_seconds": {
+            "type": "number"
+          },
+          "backend": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "entries": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "properties": {
+                "asset": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "account": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "identity": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "idle_seconds": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "connections",
+          "idle_ttl_seconds"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_put_file": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "local": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "remote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "chunks": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "remote_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "local_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checksum_match": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "warning": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_reachable": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "reachable": {
+            "type": "boolean"
+          },
+          "whoami_hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exit_code": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "delivery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "reachable"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_relay": {
+        "type": "object",
+        "properties": {
+          "source_asset": {
+            "type": "string"
+          },
+          "source_path": {
+            "type": "string"
+          },
+          "destination_asset": {
+            "type": "string"
+          },
+          "destination_path": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "chunks": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "source_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "destination_sha256_prefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checksum_match": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "source_asset",
+          "source_path",
+          "destination_asset",
+          "destination_path",
+          "bytes"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_run": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "commands": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "results": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "partial": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "delivery": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "asset"
+        ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_session_cost": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "probe": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "walk_seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "ToolResult_jmsx_audit_query": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_audit_query"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_bg_check": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_bg_check"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_bg_start": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_bg_start"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_collect": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_collect"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_collect_multi": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_collect_multi"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_exec": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_exec"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_exec_multi": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_exec_multi"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_get_file": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_get_file"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_inventory": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_inventory"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_pool_status": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_pool_status"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_put_file": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_put_file"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_reachable": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_reachable"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_relay": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_relay"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_run": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_run"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_session_cost": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_session_cost"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "自动生成（`tools openapi`），与 MCP 工具目录同源：入参/出参形状取自注册表装配时捕获的 schema（出参来自 idl/ 契约的生成物）。所有工具调用与 stdio 共用同一道风险门禁、确认语义与留痕。拒绝与失败的调用返回 HTTP 200 + is_error=true（请求没错，结果是拒绝）。",
+    "title": "jumpserver-exec HTTP API",
+    "version": "0.6.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "read_only": {
+                      "type": "boolean"
+                    },
+                    "server": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "tools": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "服务在跑"
+          }
+        },
+        "security": [],
+        "summary": "存活探针（唯一不需要令牌的路由）"
+      }
+    },
+    "/api/v1/tools": {
+      "get": {
+        "operationId": "listTools",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "tools": {
+                      "items": {
+                        "properties": {
+                          "confirm": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "input_schema": {},
+                          "name": {
+                            "type": "string"
+                          },
+                          "output_schema": {},
+                          "risk": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "目录"
+          }
+        },
+        "summary": "工具目录：名字、风险、确认要求、入参/出参形状"
+      }
+    },
+    "/api/v1/tools/jmsx_audit_query/invoke": {
+      "post": {
+        "description": "[risk: read] Read this machine's gate trail: one line per tool call, with the arguments, whether the call did anything and why not. Use it when a call was REFUSED and there is nothing else to look up — a dangerous command refused for want of a confirmation never reaches the bastion, so the bastion's own audit has no record of it and this is the only one. It also answers 'which tools ran here recently', 'what failed here' (failed=true picks those out) and, most importantly, 'what may still be RUNNING on that machine?' — delivery=maybe_sent picks out the calls whose command may still be going, and delivery=not_sent the ones that never left this process (safe to run again). This is the local trail of attempted calls; the management plane's jms_command_audit is the bastion's log of what actually ran on the assets.",
+        "operationId": "invoke_jmsx_audit_query",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_audit_query"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_audit_query"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_audit_query"
+      }
+    },
+    "/api/v1/tools/jmsx_bg_check/invoke": {
+      "post": {
+        "description": "[risk: read] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file.",
+        "operationId": "invoke_jmsx_bg_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_bg_check"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_bg_check"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_bg_check"
+      }
+    },
+    "/api/v1/tools/jmsx_bg_start/invoke": {
+      "post": {
+        "description": "[risk: write] Start a long-running command on an asset in the BACKGROUND and return immediately. Use it for work that outlasts a tool call -- a deploy, a migration, a long test -- instead of holding a session open for it. The command is detached from the session, so it survives the bastion closing the connection. Poll it with jmsx_bg_check and read the output with jmsx_get_file.",
+        "operationId": "invoke_jmsx_bg_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_bg_start"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_bg_start"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_bg_start"
+      }
+    },
+    "/api/v1/tools/jmsx_collect/invoke": {
+      "post": {
+        "description": "[risk: write] Collect several named facts from ONE machine in a single bastion session and get them back as a labelled map. Use it for a status sweep -- disk, memory, service state, versions -- where the same facts are wanted on many machines: one call per machine instead of one per question. jmsx_run does the same thing but returns a positional list, which is easy to misread when the commands have different lengths.",
+        "operationId": "invoke_jmsx_collect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_collect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_collect"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_collect"
+      }
+    },
+    "/api/v1/tools/jmsx_collect_multi/invoke": {
+      "post": {
+        "description": "[risk: write] Collect the SAME set of facts from MANY machines and get back one matrix: a row per host, a column per fact. This is the fleet sweep -- disk, memory, service state, versions -- where the same questions are asked everywhere and the answers have to be lined up side by side. Each host gets ONE bastion session (so the facts of one host cannot mix with another's) and the hosts are swept in parallel. jmsx_exec_multi is the other way round: one command, many hosts. Pass dry_run=true first on a big sweep: it opens no session and reports how many rounds the sweep would take and roughly how many seconds it would cost, next to the risk classification.",
+        "operationId": "invoke_jmsx_collect_multi",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_collect_multi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_collect_multi"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_collect_multi"
+      }
+    },
+    "/api/v1/tools/jmsx_exec/invoke": {
+      "post": {
+        "description": "[risk: write] Run a shell command on a JumpServer-managed machine THROUGH THE BASTION (koko 2222), returning stdout+stderr and the exit code. Use it for one command on one machine; jmsx_run runs several commands in one session, jmsx_exec_multi runs one command on many machines. The session is recorded in JumpServer's audit trail. The command runs as the asset account and is not elevated: prefix with 'sudo -n' for root. The answer names the account it ran as. Output is normally complete; with the koko terminal backend it is bounded by the terminal window, and full=true then fetches the rest (costs extra round trips).",
+        "operationId": "invoke_jmsx_exec",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_exec"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_exec"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_exec"
+      }
+    },
+    "/api/v1/tools/jmsx_exec_multi/invoke": {
+      "post": {
+        "description": "[risk: write] Run the SAME command on several machines through the bastion and return each host's output. Use it when a fact has to be collected from a fleet (disk usage, a version, whether a service is up) and the answer must be per host: jms_job_run fans out too, but the v5 API exposes no execution output for a job, so this is the multi-host call that actually returns results. jmsx_collect_multi is the other way round: different facts per host. Hosts run in parallel, each in its own recorded bastion session, so ten hosts cost roughly two rounds instead of ten. A host that cannot be reached is reported as failed rather than aborting the run. Pass dry_run=true first on a big sweep: it opens no session and reports how many rounds the sweep would take and roughly how many seconds it would cost, next to the risk classification.",
+        "operationId": "invoke_jmsx_exec_multi",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_exec_multi"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_exec_multi"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_exec_multi"
+      }
+    },
+    "/api/v1/tools/jmsx_get_file/invoke": {
+      "post": {
+        "description": "[risk: read] Read a file FROM an asset through the bastion and return its content (base64-encoded over the wire, decoded for you). Pass offset and length to read only part of it: the window is applied on the remote side, so peeking at the head of a huge log costs only the bytes you asked for. A whole file is held in memory on this machine, so for a big one ask for a window rather than the lot. On the koko terminal path the answer is additionally bounded by the pane (a few dozen rows): larger files come back with truncated=true and the full size in available_bytes, so narrow the range server-side with head/sed/tail rather than assuming you saw everything.",
+        "operationId": "invoke_jmsx_get_file",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_get_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_get_file"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_get_file"
+      }
+    },
+    "/api/v1/tools/jmsx_inventory/invoke": {
+      "post": {
+        "description": "[risk: read] List assets known to JumpServer with address, platform and connectivity. Use this to discover the exact asset name before calling jmsx_exec. It is the execution plane's view of the same assets the management plane's jms_assets_list lists.",
+        "operationId": "invoke_jmsx_inventory",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_inventory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_inventory"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_inventory"
+      }
+    },
+    "/api/v1/tools/jmsx_pool_status/invoke": {
+      "post": {
+        "description": "[risk: read] Report what the connection pool holds right now: how many connections are open, which machines they are on, and how long each has been idle. Use it when a repeat call on the same machine is unexpectedly fast and you want to know why, or to see what is still open on the bastion. Read-only.",
+        "operationId": "invoke_jmsx_pool_status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_pool_status"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_pool_status"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_pool_status"
+      }
+    },
+    "/api/v1/tools/jmsx_put_file/invoke": {
+      "post": {
+        "description": "[risk: destructive] Upload a file to an asset through the bastion, over the same recorded session used for commands. Suitable for deploy scripts, config fragments and certificates. The file is written to a temporary name and renamed into place, so a transfer that fails halfway leaves the file that was there before untouched, and a symlinked destination keeps its link. The size is verified after the write, so a truncated transfer fails loudly instead of leaving a corrupt file behind. Content is base64, so nothing is interpreted by the shell. Supply the payload either as content (inline text), content_base64 (inline binary), or local_path (a file already on this machine) -- exactly one of them.（需确认：set confirm=true to write a file on the machine）",
+        "operationId": "invoke_jmsx_put_file",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_put_file"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_put_file"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_put_file"
+      }
+    },
+    "/api/v1/tools/jmsx_reachable/invoke": {
+      "post": {
+        "description": "[risk: read] Check whether the bastion can open a shell on an asset (auth, permission and protocol all have to work). Use before a long job.",
+        "operationId": "invoke_jmsx_reachable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_reachable"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_reachable"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_reachable"
+      }
+    },
+    "/api/v1/tools/jmsx_relay/invoke": {
+      "post": {
+        "description": "[risk: destructive] Copy a file from one managed machine DIRECTLY to another through the bastion, without the bytes ever landing on this machine. Use it when a file has to get from one host to another and pulling it here and pushing it there would be two transfers and a copy in between. Both sides are recorded bastion sessions; the answer reports the checksum computed on each machine, so a mismatch is visible rather than silent.（需确认：set confirm=true to write a file on the destination machine）",
+        "operationId": "invoke_jmsx_relay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_relay"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_relay"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_relay"
+      }
+    },
+    "/api/v1/tools/jmsx_run/invoke": {
+      "post": {
+        "description": "[risk: write] Run several commands on ONE machine through a single bastion session and return each result in order. Much cheaper than calling jmsx_exec repeatedly: each exec re-walks the koko TUI (~10s), this pays it once. Use it when you need several facts from the same host, or a short sequence that depends on earlier output. Commands still run as the asset account and are fully recorded.",
+        "operationId": "invoke_jmsx_run",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_run"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_run"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_run"
+      }
+    },
+    "/api/v1/tools/jmsx_session_cost/invoke": {
+      "post": {
+        "description": "[risk: read] Report what one bastion session costs: how long opening it takes and how much a session-based tool call saves versus repeated jmsx_exec calls. Use it to price a sweep before running it: opening the session is what a fleet sweep really pays, not the commands. The answer names the backend the session was opened with, because the two cost very differently.",
+        "operationId": "invoke_jmsx_session_cost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_session_cost"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_session_cost"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_session_cost"
+      }
+    },
+    "/mcp": {
+      "post": {
+        "operationId": "mcpStream",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "JSON-RPC 应答（或 SSE 流）"
+          }
+        },
+        "summary": "MCP over streamable HTTP（JSON-RPC；GET 是事件流，DELETE 结束会话）"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

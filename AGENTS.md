@@ -32,9 +32,9 @@
 main.go / init.go / server.go / workers.go / shutdown.go
                              # 入口层（**仓根**的 package main）：serve / doctor / tools / version
 cmd/                        # 子命令（入口层 import 的**普通包**，不是二进制）
-├── serve/                  #   默认命令：以 stdio 提供 MCP 服务
+├── serve/                  #   跑服务：stdio MCP（默认）；`serve http` 只开 HTTP 面
 ├── doctor/                 #   自检：koko 接线
-└── tools/                  #   工具目录：名字、风险
+└── tools/                  #   工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 biz/
 ├── handler/                # 15 个工具的实现
 ├── model/jmsexec/          # 契约的生成物（thriftgo slim 模板，产物入库）
@@ -44,11 +44,12 @@ internal/
 ├── repository/koko/        # 数据访问层：koko TUI 协议 / 连接令牌 / 连接池 / 文件传输
 ├── service/policy/         # 工具目录的**风险侧**：每个工具改不改机器、要不要确认
 ├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
-├── middleware/             # （空）HTTP 中间件：这一面没有 HTTP
+├── middleware/             # （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 └── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
 idl/jmsexec/                # 契约的 thrift 定义：入口 jmsexec.thrift + 按域拆的多份
 pkg/                        # （空）通用库在 kit 仓，不在这里放东西
-etc/ swagger/ deploy/ monitoring/ rpcx/ kitex_gen/
+swagger/                    # HTTP 面的 OpenAPI（生成物：tools openapi，守卫逐字节比对）
+etc/ deploy/ monitoring/ rpcx/ kitex_gen/
                              # （空）hz 骨架里的其余层：见各目录里的 README
 script/                     # 构建 / 发布 / 生成 / 校验
 skills/                     # 给 AI 的操作手册
@@ -65,8 +66,9 @@ main 包** ⇒ 子命令的实现只能在 `cmd/` 下。
 ⚠️ **空的层不是「忘了做」**：每一层都有自己的 README，写着它为什么空、
 什么时候不再是空的。
 
-hz 的 `router.go` / `router_gen.go` 在这里没有对应物：本仓没有 HTTP 路由，
-`biz/router` 就是它们的对应物。
+hz 的 `router.go` / `router_gen.go` 在这里没有对应物：HTTP 面的路由与认证
+住在底座的 `pkg/httpapi`（两个面共用），`biz/router` 是**工具目录的装配**——
+它们的对应物。
 
 **分层的方向是硬的，有守卫盯着**（判据在本仓 `internal/arch/`，守卫体在 kit 的 `pkg/arch`）：
 - **本仓不得 import 管理面**（另一个服务）；**底座不得依赖任何服务**。
@@ -381,6 +383,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
 | **凭据** | 明文凭据不许进仓（底座 `pkg/arch/credential.go` + 本仓 `internal/arch/execution_test.go` 的 `TestThePlaintextCredentialsAreNotInTheRepository`）⇒ 守卫体一份，两个面各接一个入口 |
+| HTTP 契约 | `swagger/openapi.json` 与工具目录**逐字节**一致（`openapi_test.go`）；改了工具 / 契约 / `Version` 就跑 `./script/gen-openapi.sh`。「这道守卫会红」由 `script/mutate-swagger-guard.py` 机械证明（对照 + canary + 4 条变异，全红才算过） |
 | 自检 | `./bin/jumpserver-exec --doctor` 退出码 0（查密钥类型 / 端口 / 真实 koko 登录） |
 | 真调 | 重启会话后实际调一次新工具；**重启前**可用 JSON-RPC 直接驱动已发布二进制（参考 `script/verify-mcp-launch.py`） |
 

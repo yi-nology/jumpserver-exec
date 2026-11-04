@@ -40,6 +40,25 @@ type Config struct {
 
 	// Audit is where the gate's trail goes.
 	Audit audit.Settings
+
+	// HTTPAddr is where the HTTP surface listens: the REST face
+	// (/api/v1/…) plus MCP over streamable HTTP (/mcp). Empty means no
+	// HTTP surface — the server speaks stdio only, which is the mode an
+	// MCP runtime launches it in.
+	//
+	// ⚠️ The default is empty ON PURPOSE: turning a stdio server into a
+	// network listener is an operator's decision, not a default. And
+	// 127.0.0.1, not 0.0.0.0 — these routes run commands on your
+	// machines with the deployment's own credential; exposing that to a
+	// network needs a proxy and a TLS story this process does not have.
+	HTTPAddr string
+	// HTTPToken is the bearer token the HTTP surface demands on every
+	// route except /api/v1/health.
+	//
+	// ⚠️ There is no "auth off": JMS_HTTP_ADDR without JMS_HTTP_TOKEN is
+	// refused at start-up. A surface that answers tool calls to whoever
+	// can reach the port is not a surface this server will serve.
+	HTTPToken string
 }
 
 // APIConfig is the REST endpoint of the bastion.
@@ -168,6 +187,13 @@ type settings struct {
 	RequestsPerSecond int `yaml:"requests_per_second" env:"JMS_REQUESTS_PER_SECOND" default:"20"`
 	Burst             int `yaml:"burst" env:"JMS_BURST" default:"40"`
 
+	// The HTTP surface: where it listens and the bearer token it demands.
+	// Both empty means no HTTP surface (stdio only). ⚠️ One without the
+	// other is refused at start-up: JMS_HTTP_ADDR with no JMS_HTTP_TOKEN
+	// would answer tool calls to whoever can reach the port.
+	HTTPAddr  string `yaml:"http_addr" env:"JMS_HTTP_ADDR"`
+	HTTPToken string `yaml:"http_token" env:"JMS_HTTP_TOKEN"`
+
 	// The Chat AI delegation credential's identity. The secret itself is
 	// NOT an env-driven field here: it is read from JMS_DELEGATION_SECRET
 	// or from the key file, because it is a secret and not a setting.
@@ -206,6 +232,15 @@ func Load() (Config, error) {
 			RequestsPerSecond: float64(s.RequestsPerSecond),
 			Burst:             s.Burst,
 		},
+		HTTPAddr:  strings.TrimSpace(s.HTTPAddr),
+		HTTPToken: strings.TrimSpace(s.HTTPToken),
+	}
+	// ⚠️ No "auth off": the HTTP surface answers tool calls on the
+	// operator's machines, so it needs a bearer token.
+	if cfg.HTTPAddr != "" && cfg.HTTPToken == "" {
+		return Config{}, fmt.Errorf("JMS_HTTP_ADDR is set but JMS_HTTP_TOKEN is not: the HTTP surface answers " +
+			"tool calls, so it needs a bearer token. Generate one (openssl rand -hex 32) and set " +
+			"JMS_HTTP_TOKEN, or unset JMS_HTTP_ADDR to stay on stdio only")
 	}
 	// ⚠️ The password is read from a file when it is not in the
 	// environment, and it is read ONLY when there is no PrivateToken: the

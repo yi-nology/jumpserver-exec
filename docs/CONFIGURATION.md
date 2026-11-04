@@ -149,6 +149,8 @@ jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 | `JMS_POOL_TTL` | 否 | `2m` | 空闲连接在池里留多久。连接池让同一台机器的第二次调用几乎免费（实测 1.04s → 0.26s）。⚠️ 池里的连接**不出现在堡垒机的会话列表里**（堡垒机记的是每条命令的 exec 会话，跑完就结束）；但资产上会留一个 `sshd-session: <user> [priv]` 进程，所以这个值越长，资产上挂着的进程越多 |
 | `JMS_BACKEND_MEMORY_TTL` | 否 | `10m` | **后端记忆**记多久：记住上次走通的是哪条路（令牌还是终端），下次先试它。记忆只改**顺序**，从不跳过一条路，也从不把资产问题变成兜底。⚠️ **会过期**：过期后回到默认顺序（先令牌）—— 令牌这条路恢复了只能靠**再试一次**找回来。设 `0` 即关闭记忆 |
 | `JMS_READ_ONLY` | 否 | `false` | 只读模式：执行面拒掉 `jmsx_exec` / `jmsx_run` / `jmsx_exec_multi` / `jmsx_put_file` / `jmsx_bg_start`，只留采集与清单 |
+| `JMS_HTTP_ADDR` | 否 | 无（只 stdio） | **HTTP 面**监听地址（REST `/api/v1/…` + MCP over streamable HTTP `/mcp`）。⚠️ 写 `127.0.0.1:<端口>`（例 `127.0.0.1:8732`），别写 `0.0.0.0` —— 这些路由带着部署自己的凭据去打堡垒机，暴露到网络需要你自己有代理与 TLS 的故事。`serve http` 模式下必填，否则启动拒绝。详见 §3.9 |
+| `JMS_HTTP_TOKEN` | 配了 ADDR 就**是** | 无 | HTTP 面的 **Bearer 令牌**（`openssl rand -hex 32` 生成）。除 `/api/v1/health` 外每个路由都要它。⚠️ **没有「不开认证」模式**：ADDR 有、TOKEN 无 ⇒ 启动即拒。轮换 = 改环境变量重启 |
 
 ### 3.2 与管理面共用
 
@@ -303,6 +305,30 @@ chmod 600 ~/.config/jumpserver-mgmt/delegation.key
 
 ⚠️ **数组里的裸字符串不被脱敏**：脱敏靠**键名** ⇒ 元素没有键名时原文进留痕。
 ⇒ **别把凭据放进没有键名的位置**。
+
+### 3.9 HTTP 面（REST + MCP over HTTP）
+
+配了 `JMS_HTTP_ADDR` + `JMS_HTTP_TOKEN`（见 §3.1 表）就开第二个面，**同一个注册表**：
+同一道风险门禁、同一套确认语义、同一份留痕 —— stdio 拒的，这里一样拒。
+
+| 路由 | 干什么 |
+|---|---|
+| `GET /api/v1/health` | 存活探针，**唯一**不要令牌的路由（只报名字 / 版本 / 只读与否 / 工具数） |
+| `GET /api/v1/tools` | 工具目录：名字、风险、确认要求、入参 / 出参形状 |
+| `POST /api/v1/tools/{name}/invoke` | 调一个工具，入参是该工具的 input schema |
+| `GET / POST / DELETE /mcp` | MCP over streamable HTTP（JSON-RPC；GET 是事件流） |
+
+- **结果的读法与 stdio 逐字相同**：拒绝、失败、入参不合形状一律 **HTTP 200 +
+  `is_error=true`**（请求没错，结果是拒绝 / 失败）；请求本身不是 JSON 或不是对象才
+  400；没有这个工具才 404。⇒ 客户端只需要学**一种**错误方言。
+- **两种跑法**：`serve`（默认，stdio）配了 `JMS_HTTP_ADDR` 会**顺带**开 HTTP
+  （一个进程、一份留痕；stdio 断了进程就退，插座跟着没）；`serve http` 只开 HTTP，
+  长跑到 SIGINT/SIGTERM —— 当服务部署用这个。
+- **留痕的 `client` 列是 `rest`**：HTTP 面认证的是**令牌**不是人，留痕不记
+  「alice」。`/api/v1/health` 不留痕（探针不是调用）。
+- **契约文档**：[`swagger/openapi.json`](../swagger/openapi.json)（生成物，与工具
+  同源）；改了工具跑 `./script/gen-openapi.sh` 重新生成，守卫（`openapi_test.go`）
+  拿它逐字节比对。
 
 ---
 
