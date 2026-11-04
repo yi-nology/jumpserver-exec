@@ -68,6 +68,20 @@ func effectiveTimeout(want int) int {
 	return want
 }
 
+// commandTimeout is the per-command timeout a single-machine tool will
+// actually use: the default when the caller did not say.
+//
+// Unlike effectiveTimeout it answers in a duration and carries no sweep
+// semantics — it is the same idea at the one-command scale, and the two
+// spellings used to be hand-rolled at every call site, drifting in their
+// defaults before they were collected here.
+func commandTimeout(want, def int) time.Duration {
+	if want <= 0 {
+		return time.Duration(def) * time.Second
+	}
+	return time.Duration(want) * time.Second
+}
+
 // planSweep prices a sweep of `hosts` machines, each running
 // `commandsPerHost` commands.
 //

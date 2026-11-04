@@ -90,9 +90,6 @@ func (s *Session) Exec(commands []string, timeout time.Duration) ([]string, erro
 	return results, nil
 }
 
-// Asset reports which machine this session is attached to.
-func (s *Session) Asset() string { return s.asset }
-
 // Stats describes how much the session has been used.
 //
 // The walk is the number that matters: it is what every command of this
@@ -214,31 +211,6 @@ func (s *Session) PutBytesAt(remotePath string, data []byte, extend bool, timeou
 		return s.backend.AppendBytes(remotePath, data, timeout)
 	}
 	return s.backend.PutBytes(remotePath, data, timeout)
-}
-
-// AppendBytes writes bytes at the END of a file on the asset.
-//
-// It is what a chunked transfer needs after its first chunk.
-func (s *Session) AppendBytes(remotePath string, data []byte, timeout time.Duration) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.backend == nil {
-		return fmt.Errorf("the session is closed")
-	}
-	return s.backend.AppendBytes(remotePath, data, timeout)
-}
-
-// Backend describes how this session was opened.
-//
-// It is one of the words the answer uses, so a caller can tell a session that
-// walked the koko terminal from one that used a connection token.
-func (s *Session) Backend() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.backend == nil {
-		return ""
-	}
-	return s.backend.Describe()
 }
 
 // Reused says whether this session came from the connection pool.

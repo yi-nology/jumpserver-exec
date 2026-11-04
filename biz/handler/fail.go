@@ -2,6 +2,8 @@ package handler
 
 import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
 
 // fail hands the error back AS IT IS.
@@ -21,4 +23,17 @@ import (
 // and `render.Failf` says it better.
 func fail(err error) (*mcp.CallToolResult, any, error) {
 	return nil, nil, err
+}
+
+// errFields fills an answer's error path from a typed error: the error's own
+// text, and — when the error knows it — its delivery state.
+//
+// This is the pair every answer's error path writes, and it is the same pair
+// `fail` keeps for the error-result path: the state must survive the trip to
+// the caller whichever way the failure is reported.
+func errFields(err error) (msg *string, delivery *string) {
+	if d := reg.DeliveryOf(err); d != jms.Delivery(0) {
+		return jms.Opt(err.Error()), jms.Opt(d.String())
+	}
+	return jms.Opt(err.Error()), nil
 }

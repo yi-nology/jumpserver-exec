@@ -134,32 +134,6 @@ func (b *buffer) String() string {
 	return string(b.buf)
 }
 
-// waitFor polls the screen until every fragment appears, the deadline passes,
-// or done fires (used to abort when a negative marker such as
-// "没有可用的授权账号" shows up instead).
-func (b *buffer) waitFor(timeout time.Duration, frags []string) (string, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		s := b.String()
-		missing := ""
-		all := true
-		for _, f := range frags {
-			if !strings.Contains(s, f) {
-				all, missing = false, f
-				break
-			}
-		}
-		if all {
-			return s, nil
-		}
-		if time.Now().After(deadline) {
-			return s, fmt.Errorf("timeout %s waiting for %q; screen tail: %s",
-				timeout, missing, tail(s, 400))
-		}
-		time.Sleep(150 * time.Millisecond)
-	}
-}
-
 // Koko is one authenticated koko session, pre-positioned on an asset shell.
 type Koko struct {
 	Client  *ssh.Client
@@ -200,7 +174,6 @@ type Config struct {
 	Port    int    // koko SSH port, 2222
 	User    string // JumpServer user (has an SSHKey registered)
 	KeyPath string // private key path
-	Timeout time.Duration
 
 	// Backend selects how a session is opened: "auto" (the connection token
 	// first, the TUI as a fallback), "token" or "tui". Empty means auto.
@@ -736,11 +709,8 @@ func (k *Koko) selectAsset(timeout time.Duration) error {
 			return fmt.Errorf("koko cannot see any asset matching %q: check the name, "+
 				"and that the koko user has an asset permission covering it", k.Asset)
 		}
-		if strings.Contains(last, noAsset) {
-			return fmt.Errorf("asset %q disappeared from the koko list", k.Asset)
-		}
 	}
-	return fmt.Errorf("no shell prompt on %q after 5 confirms; screen tail: %s",
+	return fmt.Errorf("no shell prompt on %q after 6 confirms; screen tail: %s",
 		k.Asset, tail(last, 500))
 }
 
@@ -1027,19 +997,6 @@ func resultSignature(s string, m marks, minEpoch int) (rows int, code int, finge
 	return len(r), c, h.Sum64()
 }
 
-// countResult reports how many numbered rows this capture already holds, so the
-// caller can wait for the result to stop growing instead of merely appearing.
-//
-// "At least one row" is not good enough. tmux paints progressively, and a wide
-// payload (base64 at 190 columns) takes noticeably longer to reach the screen
-// than a narrow one — so returning on the first row hands back a half-drawn
-// block. Measured 2026-10-15: a 3292-byte payload came back as 1645 bytes, every
-// chunk of it silently short, which looks exactly like a short file.
-func countResult(s string, m marks, minEpoch int) int {
-	rows, _, _ := resultSignature(s, m, minEpoch)
-	return rows
-}
-
 // parseOutput reconstructs the command result from the captured screen.
 //
 // It deliberately does NOT assume the payload sits in one contiguous span
@@ -1176,12 +1133,8 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].n < rows[j].n })
 	out := make([]string, 0, len(rows))
-	maxN := 0
 	for _, r := range rows {
 		out = append(out, r.t)
-		if r.n > maxN {
-			maxN = r.n
-		}
 	}
 
 	// The pane is only as tall as the PTY, so a long result is cut off at the
@@ -1204,7 +1157,6 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 	if len(rows) > 0 && rows[0].idx > 3 {
 		truncated = true
 	}
-	_ = maxN
 	return out, code, truncated
 }
 

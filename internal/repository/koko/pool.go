@@ -171,6 +171,12 @@ func NewPool(cfg Config, ttl time.Duration) *Pool {
 	return p
 }
 
+// TTL is how long this pool actually keeps an idle connection — the value it
+// was configured with (JMS_POOL_TTL), not the compiled-in default. The answer
+// that quotes the TTL and the doctor that checks it have to read it here, or
+// an operator who changed the setting reads a stale number.
+func (p *Pool) TTL() time.Duration { return p.ttl }
+
 // key identifies a connection: the asset and the account it runs as.
 //
 // The asset part is the RESOLVED id, not the string the caller typed. Two
@@ -381,16 +387,15 @@ func (p *Pool) sweep() {
 func (p *Pool) reap() {
 	p.mu.Lock()
 	var dead []*pooledConn
-	var busy []*pooledConn
 	for key, c := range p.conns {
 		if time.Since(c.lastUse) <= p.ttl {
 			continue
 		}
 		// TryLock, not Lock: a connection in use is skipped this round
-		// rather than waited for, so the reaper never blocks.
+		// rather than waited for, so the reaper never blocks — it stays
+		// in the pool and is collected on a later round.
 		release, ok := c.gate.TryAcquire()
 		if !ok {
-			busy = append(busy, c)
 			continue
 		}
 		release()
@@ -401,9 +406,6 @@ func (p *Pool) reap() {
 	for _, c := range dead {
 		c.close()
 	}
-	// A connection that was busy when the reaper came by is still there;
-	// it will be collected on a later round.
-	_ = busy
 }
 
 // Holds says whether the pool already has a connection for this asset.

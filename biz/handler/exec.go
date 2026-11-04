@@ -52,10 +52,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		if riskClass, would, blocked := rehearsal(cmdClass, args.Confirm); !would {
 			return render.Text(blockedCommand(args.Asset, args.Command, riskClass, blocked))
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 60 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 60)
 		if timeout > 600*time.Second {
 			timeout = 600 * time.Second
 		}
@@ -156,10 +153,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		res := &jmsexec.ReachableResult{Asset: args.Asset}
 		k, err := koko.Open(ctx, cfg.Koko, args.Asset, "", 90*time.Second)
 		if err != nil {
-			res.Error = jms.Opt(err.Error())
-			if d := reg.DeliveryOf(err); d != jms.Delivery(0) {
-				res.Delivery = jms.Opt(d.String())
-			}
+			res.Error, res.Delivery = errFields(err)
 			return render.Text(res)
 		}
 		defer k.Close()
@@ -167,10 +161,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		out, code, truncated, err := k.Exec("id -un; hostname", 30*time.Second)
 		_ = truncated
 		if err != nil {
-			res.Error = jms.Opt(err.Error())
-			if d := reg.DeliveryOf(err); d != jms.Delivery(0) {
-				res.Delivery = jms.Opt(d.String())
-			}
+			res.Error, res.Delivery = errFields(err)
 			return render.Text(res)
 		}
 		// An empty result with no exit code means the shell opened but the probe

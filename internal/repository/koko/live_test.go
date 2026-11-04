@@ -42,7 +42,6 @@ func liveConfig(t *testing.T) Config {
 		Host:    os.Getenv("JMS_BASTION_HOST"),
 		Port:    2222,
 		User:    "ai",
-		Timeout: 90 * time.Second,
 		Backend: BackendToken,
 		API:     jmsapi.New(jmsapi.Options{BaseURL: base, Token: token}),
 	}

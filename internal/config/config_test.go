@@ -123,9 +123,6 @@ func TestKokoSettingsAreUnchanged(t *testing.T) {
 	if cfg.Koko.User != "someone" {
 		t.Errorf("Koko.User = %q", cfg.Koko.User)
 	}
-	if cfg.Koko.Timeout != 90*time.Second {
-		t.Errorf("Koko.Timeout = %v", cfg.Koko.Timeout)
-	}
 }
 
 // The backend mode is an enum, and an unknown value must not be accepted:

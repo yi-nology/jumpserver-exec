@@ -475,7 +475,7 @@ func mintConnectionToken(ctx context.Context, cfg Config, assetID, accountID str
 		//
 		// So the identity is resolved here, once, and kept in the config
 		// for the next call.
-		if ok, why := dc.Available(); !ok {
+		if ok, _ := dc.Available(); !ok {
 			if len(dc.Secret) > 0 {
 				if err := cfg.API.EnsureDelegationIdentityAs(ctx, dc, cfg.User); err != nil {
 					return connectionToken{}, fmt.Errorf(
@@ -483,8 +483,6 @@ func mintConnectionToken(ctx context.Context, cfg Config, assetID, accountID str
 							"minting a connection token with the API token instead would give the session that "+
 							"token's authority rather than %s's", err, jmsapi.DelegationUsername(cfg.User))
 				}
-			} else {
-				_ = why
 			}
 		}
 		if ok, _ := dc.Available(); ok {
@@ -1000,7 +998,30 @@ func (t *tokenBackend) UploadChunkBytes() int { return tokenUploadChunkBytes }
 // The command is `cat > file`, which truncates the destination — the same
 // thing the base64 path did when it decoded over the target.
 func (t *tokenBackend) PutBytes(remotePath string, data []byte, timeout time.Duration) error {
-	cmd := fmt.Sprintf("cat > %s", shellx.Quote(remotePath))
+	return t.writeBytes("writing", "cat >", remotePath, data, timeout)
+}
+
+// CanCarryBytes says whether this backend can carry file bytes on its
+// command channel. It can: the bytes go on the channel's stdin.
+func (t *tokenBackend) CanCarryBytes() bool { return true }
+
+// AppendBytes writes bytes at the END of a file on the asset.
+//
+// It is the same channel as PutBytes, with `cat >>` instead of `cat >`:
+// the first chunk of a transfer replaces the file and the rest extend it.
+func (t *tokenBackend) AppendBytes(remotePath string, data []byte, timeout time.Duration) error {
+	return t.writeBytes("appending to", "cat >>", remotePath, data, timeout)
+}
+
+// writeBytes is the one body PutBytes and AppendBytes share: the command
+// differs by one redirect and the error by one verb — everything else,
+// including the not-delivered retry, is the same write.
+//
+// ⚠️ The retry below is the ONLY place a write may run twice: it fires when
+// the command never reached the machine (errNotDelivered), which is the one
+// failure a second run cannot double-apply.
+func (t *tokenBackend) writeBytes(verb, redirect, remotePath string, data []byte, timeout time.Duration) error {
+	cmd := fmt.Sprintf("%s %s", redirect, shellx.Quote(remotePath))
 	code, err := t.runWithInput(cmd, bytes.NewReader(data), timeout)
 	if err != nil && errors.Is(err, errNotDelivered) {
 		// The command never reached the machine, so writing it again is
@@ -1014,33 +1035,7 @@ func (t *tokenBackend) PutBytes(remotePath string, data []byte, timeout time.Dur
 		return err
 	}
 	if code != 0 {
-		return fmt.Errorf("writing %s on %s exited %d", remotePath, t.asset, code)
-	}
-	return nil
-}
-
-// CanCarryBytes says whether this backend can carry file bytes on its
-// command channel. It can: the bytes go on the channel's stdin.
-func (t *tokenBackend) CanCarryBytes() bool { return true }
-
-// AppendBytes writes bytes at the END of a file on the asset.
-//
-// It is the same channel as PutBytes, with `cat >>` instead of `cat >`:
-// the first chunk of a transfer replaces the file and the rest extend it.
-func (t *tokenBackend) AppendBytes(remotePath string, data []byte, timeout time.Duration) error {
-	cmd := fmt.Sprintf("cat >> %s", shellx.Quote(remotePath))
-	code, err := t.runWithInput(cmd, bytes.NewReader(data), timeout)
-	if err != nil && errors.Is(err, errNotDelivered) {
-		if rerr := t.reconnect(); rerr != nil {
-			return fmt.Errorf("%w (reopening the connection failed too: %v)", err, rerr)
-		}
-		code, err = t.runWithInput(cmd, bytes.NewReader(data), timeout)
-	}
-	if err != nil {
-		return err
-	}
-	if code != 0 {
-		return fmt.Errorf("appending to %s on %s exited %d", remotePath, t.asset, code)
+		return fmt.Errorf("%s %s on %s exited %d", verb, remotePath, t.asset, code)
 	}
 	return nil
 }

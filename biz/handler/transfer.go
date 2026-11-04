@@ -118,10 +118,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			res.Blocked = jms.Opt(blocked)
 			return render.Text(res)
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 60 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 60)
 		// Opening the session is paid once; each command then gets its own
 		// budget on top of it.
 		s, err := koko.OpenSession(ctx, cfg.Koko, args.Asset, timeout+120*time.Second)
@@ -134,15 +131,12 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 		res.Results = results
 		res.Stats = s.Stats()
 		if runErr != nil {
-			res.Error = jms.Opt(runErr.Error())
 			res.Partial = jms.OptBool(true)
 			// How far the commands got. The trail asks "what may still be
 			// running on that machine?", and this answer is where the
 			// answer lives — the call itself succeeded, so nothing else
 			// would say it.
-			if d := reg.DeliveryOf(runErr); d != jms.Delivery(0) {
-				res.Delivery = jms.Opt(d.String())
-			}
+			res.Error, res.Delivery = errFields(runErr)
 		}
 		return render.Text(res)
 	})
@@ -187,10 +181,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			return render.Failf("pass exactly one of local_path, content or content_base64 (got %s)",
 				strings.Join(sources, ", "))
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 60 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 60)
 
 		s, err := koko.OpenSession(ctx, cfg.Koko, args.Asset, timeout+120*time.Second)
 		if err != nil {
@@ -286,10 +277,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 		if strings.TrimSpace(args.RemotePath) == "" {
 			return render.Failf("remote_path is required")
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 60 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 60)
 		s, err := koko.OpenSession(ctx, cfg.Koko, args.Asset, timeout+120*time.Second)
 		if err != nil {
 			return fail(err)
@@ -362,10 +350,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 		if strings.TrimSpace(args.SourcePath) == "" || strings.TrimSpace(args.DestinationPath) == "" {
 			return render.Failf("both source_path and destination_path are required")
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 120 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 120)
 		res, err := koko.Relay(ctx, cfg.Koko, args.Source, args.SourcePath,
 			args.Destination, args.DestinationPath, timeout)
 		if err != nil {
@@ -400,12 +385,20 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			"the same machine is unexpectedly fast and you want to know why, or to see what is still open " +
 			"on the bastion. Read-only.",
 		OutputSchema: render.Schema[jmsexec.PoolStatus]()}, func(ctx context.Context, _ *mcp.CallToolRequest, args poolArgs) (*mcp.CallToolResult, any, error) {
-		status := &jmsexec.PoolStatus{
-			IdleTTLSeconds: koko.PoolTTL.Seconds(),
-			Backend:        jms.Opt(cfg.Koko.Backend),
+		// The TTL the pool actually runs with — JMS_POOL_TTL, not the
+		// compiled-in default — is the one the answer has to quote, or an
+		// operator who raised it reads a stale number here and in doctor.
+		ttl := koko.PoolTTL
+		backend := cfg.Koko.Backend
+		if backend == "" {
+			backend = koko.BackendAuto
 		}
-		if status.Backend == nil || *status.Backend == "" {
-			status.Backend = jms.Opt(koko.BackendAuto)
+		if cfg.Koko.Pool != nil {
+			ttl = cfg.Koko.Pool.TTL()
+		}
+		status := &jmsexec.PoolStatus{
+			IdleTTLSeconds: ttl.Seconds(),
+			Backend:        jms.Opt(backend),
 		}
 		if cfg.Koko.Pool == nil {
 			status.Connections = 0
@@ -472,41 +465,23 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			res.Blocked = jms.Opt(blocked)
 			return render.Text(res)
 		}
-		timeout := time.Duration(args.Timeout) * time.Second
-		if timeout <= 0 {
-			timeout = 60 * time.Second
-		}
+		timeout := commandTimeout(args.Timeout, 60)
 		s, err := koko.OpenSession(ctx, cfg.Koko, args.Asset, timeout+120*time.Second)
 		if err != nil {
 			return fail(err)
 		}
 		defer s.Close()
 
-		commands := make([]string, 0, len(args.Checks))
-		for _, c := range args.Checks {
-			commands = append(commands, c.Command)
-		}
-		outputs, runErr := s.Exec(commands, timeout)
-		facts := map[string]*jmsexec.Fact{}
-		for i, c := range args.Checks {
-			entry := &jmsexec.Fact{Command: jms.Opt(c.Command)}
-			if i < len(outputs) {
-				entry.Output = jms.Opt(outputs[i])
-			}
-			facts[c.Name] = entry
-		}
-		res.Facts = facts
+		outputs, runErr := s.Exec(checkCommands(args.Checks), timeout)
+		res.Facts = factMap(args.Checks, outputs)
 		res.Stats = s.Stats()
 		if runErr != nil {
-			res.Error = jms.Opt(runErr.Error())
 			res.Partial = jms.OptBool(true)
 			// How far the commands got. The trail asks "what may still be
 			// running on that machine?", and this answer is where the
 			// answer lives — the call itself succeeded, so nothing else
 			// would say it.
-			if d := reg.DeliveryOf(runErr); d != jms.Delivery(0) {
-				res.Delivery = jms.Opt(d.String())
-			}
+			res.Error, res.Delivery = errFields(runErr)
 		}
 		return render.Text(res)
 	})
@@ -688,37 +663,22 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			s, err := koko.OpenSession(ctx, cfg.Koko, asset, timeout+180*time.Second)
 			if err != nil {
 				entry.Ok = jms.OptBool(false)
-				entry.Error = jms.Opt(err.Error())
 				// The session never opened, so the commands never left
 				// this process. Saying so is what tells the operator
 				// "this host never even started" apart from "this host
 				// may still be running it".
-				if d := reg.DeliveryOf(err); d != jms.Delivery(0) {
-					entry.Delivery = jms.Opt(d.String())
-				}
+				entry.Error, entry.Delivery = errFields(err)
 				entry.Seconds = jms.OptFloat64(time.Since(hostStarted).Seconds())
 				return entry
 			}
 			defer s.Close()
 			// One session, all the checks: the facts of one host cannot mix
 			// with another's, and the session is opened once per host.
-			commands := slicex.Map(args.Checks, func(c collectCheck) string { return c.Command })
-			outputs, runErr := s.Exec(commands, timeout)
-			facts := map[string]*jmsexec.Fact{}
-			for i, c := range args.Checks {
-				f := &jmsexec.Fact{Command: jms.Opt(c.Command)}
-				if i < len(outputs) {
-					f.Output = jms.Opt(outputs[i])
-				}
-				facts[c.Name] = f
-			}
-			entry.Facts = facts
+			outputs, runErr := s.Exec(checkCommands(args.Checks), timeout)
+			entry.Facts = factMap(args.Checks, outputs)
 			entry.Ok = jms.OptBool(runErr == nil)
 			if runErr != nil {
-				entry.Error = jms.Opt(runErr.Error())
-				if d := reg.DeliveryOf(runErr); d != jms.Delivery(0) {
-					entry.Delivery = jms.Opt(d.String())
-				}
+				entry.Error, entry.Delivery = errFields(runErr)
 				if reg.DeliveryOf(runErr) == jms.Delivery_maybe_sent {
 					maybeRunning.Store(true)
 				}
@@ -727,28 +687,15 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			return entry
 		})
 
-		okCount, failCount := 0, 0
 		matrix := map[string]*jmsexec.MatrixRow{}
-		firstFailure := ""
-		allNotSent := true
 		for _, r := range results {
 			if r == nil {
 				continue
 			}
 			// Every host goes into the matrix — the succeeded ones too.
 			matrix[r.GetAsset()] = r
-			if r.GetOk() {
-				okCount++
-				continue
-			}
-			failCount++
-			if firstFailure == "" {
-				firstFailure = r.GetError()
-			}
-			if r.GetDelivery() != jms.Delivery_not_sent.String() {
-				allNotSent = false
-			}
 		}
+		okCount, failCount, firstFailure, allNotSent := sweepCounts(results, nil)
 		res.Matrix = matrix
 		res.Delivery = callDelivery(maybeRunning.Load(), okCount, failCount, allNotSent)
 		note := "one recorded bastion session per host; the facts of one host never mix with another's"
@@ -848,12 +795,9 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 				s, err := koko.OpenSession(ctx, cfg.Koko, asset, timeout+120*time.Second)
 				if err != nil {
 					entry.Ok = jms.OptBool(false)
-					entry.Error = jms.Opt(err.Error())
 					// The session never opened, so the command never
 					// left this process.
-					if d := reg.DeliveryOf(err); d != jms.Delivery(0) {
-						entry.Delivery = jms.Opt(d.String())
-					}
+					entry.Error, entry.Delivery = errFields(err)
 					entry.Seconds = jms.OptFloat64(time.Since(hostStarted).Seconds())
 					results[idx] = entry
 					firstErr.Store(true)
@@ -878,10 +822,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 				}
 				if runErr != nil {
 					entry.Ok = jms.OptBool(false)
-					entry.Error = jms.Opt(runErr.Error())
-					if d := reg.DeliveryOf(runErr); d != jms.Delivery(0) {
-						entry.Delivery = jms.Opt(d.String())
-					}
+					entry.Error, entry.Delivery = errFields(runErr)
 					if reg.DeliveryOf(runErr) == jms.Delivery_maybe_sent {
 						maybeRunning.Store(true)
 					}
@@ -925,10 +866,8 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 		close(jobs)
 		wg.Wait()
 
-		okCount, failCount, skipped := 0, 0, 0
+		skipped := 0
 		ordered := []*jmsexec.HostResult{}
-		firstFailure := ""
-		allNotSent := true
 		notAttempted := 0
 		for _, r := range results {
 			if r == nil {
@@ -946,20 +885,9 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 			ordered = append(ordered, r)
 			if r.GetSkipped() {
 				skipped++
-				continue
-			}
-			if r.GetOk() {
-				okCount++
-				continue
-			}
-			failCount++
-			if firstFailure == "" {
-				firstFailure = r.GetError()
-			}
-			if r.GetDelivery() != jms.Delivery_not_sent.String() {
-				allNotSent = false
 			}
 		}
+		okCount, failCount, firstFailure, allNotSent := sweepCounts(results, func(r *jmsexec.HostResult) bool { return r.GetSkipped() })
 		res.Delivery = callDelivery(maybeRunning.Load(), okCount, failCount, allNotSent)
 		if s := sweepSummary(okCount, failCount, firstFailure); s != "" {
 			res.Error = jms.Opt(s)
@@ -1057,6 +985,62 @@ func checkList(checks []collectCheck) []*jmsexec.Check {
 		})
 	}
 	return out
+}
+
+// checkCommands flattens the checks into the command list the session runs,
+// in the same order — fact i answers check i.
+func checkCommands(checks []collectCheck) []string {
+	return slicex.Map(checks, func(c collectCheck) string { return c.Command })
+}
+
+// factMap lines each check up with its output: fact i belongs to check i, and
+// a run that stopped early leaves the tail without an output — kept as an
+// absent output rather than filled with a placeholder, because "no output"
+// and "empty output" are different facts.
+func factMap(checks []collectCheck, outputs []string) map[string]*jmsexec.Fact {
+	facts := map[string]*jmsexec.Fact{}
+	for i, c := range checks {
+		f := &jmsexec.Fact{Command: jms.Opt(c.Command)}
+		if i < len(outputs) {
+			f.Output = jms.Opt(outputs[i])
+		}
+		facts[c.Name] = f
+	}
+	return facts
+}
+
+// sweepCounts aggregates a sweep's per-host rows: how many ran, how many
+// failed, the first failure, and whether every failure said "never sent".
+//
+// A nil row is skipped — the caller counts it apart ("never attempted" is a
+// different thing from "failed"). A row the caller's skip predicate drops
+// (stop_on_error's "not attempted") is not a failure either: it never ran,
+// and counting it as one would say a sweep half failed when it was stopped
+// on purpose.
+func sweepCounts[T interface {
+	comparable
+	GetOk() bool
+	GetError() string
+	GetDelivery() string
+}](rows []T, skip func(T) bool) (ok, fail int, firstFailure string, allNotSent bool) {
+	allNotSent = true
+	for _, r := range rows {
+		if any(r) == nil || (skip != nil && skip(r)) {
+			continue
+		}
+		if r.GetOk() {
+			ok++
+			continue
+		}
+		fail++
+		if firstFailure == "" {
+			firstFailure = r.GetError()
+		}
+		if r.GetDelivery() != jms.Delivery_not_sent.String() {
+			allNotSent = false
+		}
+	}
+	return ok, fail, firstFailure, allNotSent
 }
 
 // collectClass is the risk of the commands the caller asked for.

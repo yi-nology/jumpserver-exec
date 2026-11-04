@@ -278,7 +278,6 @@ func Load() (Config, error) {
 		Port:    s.KokoPort,
 		User:    strings.TrimSpace(s.KokoUser),
 		KeyPath: fspath.ExpandHome(s.KokoKey),
-		Timeout: 90 * time.Second,
 		Backend: s.Backend,
 	}
 	// ⚠️ The koko terminal backend is the one that needs the bastion's

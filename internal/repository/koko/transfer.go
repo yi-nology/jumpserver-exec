@@ -75,7 +75,6 @@ type TransferResult struct {
 	Bytes      int
 	Chunks     int
 	Seconds    float64
-	Truncated  bool
 	// RemoteSHA256 is the checksum computed on the host, LocalSHA256 the one
 	// computed on the bytes that were sent. ChecksumMatch says whether the
 	// file arrived intact -- a matching size alone does not prove that.
@@ -188,19 +187,10 @@ func (s *Session) putBytesOverChannel(data []byte, remotePath string, timeout ti
 	// The size and the checksum are read back from the host, so the result
 	// can state that the file arrived intact rather than merely that the
 	// write did not fail.
-	out, _, _, err := s.Run(fmt.Sprintf("wc -c < %s | tr -d ' '", qTarget), timeout)
+	remote, local, err := s.verifyUpload(target, data, timeout)
 	if err != nil {
 		return nil, true, err
 	}
-	got := 0
-	fmt.Sscanf(strings.TrimSpace(out), "%d", &got)
-	if got != len(data) {
-		return nil, true, fmt.Errorf("size mismatch: sent %d bytes, %s has %d",
-			len(data), remotePath, got)
-	}
-	sum, _, _, _ := s.Run(fmt.Sprintf("sha256sum %s | cut -c1-16", qTarget), timeout)
-	remote := strings.TrimSpace(sum)
-	local := Sha256Prefix(data)
 
 	return &TransferResult{
 		Asset: s.asset, RemotePath: remotePath,
@@ -210,6 +200,30 @@ func (s *Session) putBytesOverChannel(data []byte, remotePath string, timeout ti
 		LocalSHA256:   local,
 		ChecksumMatch: remote != "" && remote == local,
 	}, true, nil
+}
+
+// verifyUpload reads back the file the host now holds and compares it with
+// the bytes that were sent: the size first, then the checksum.
+//
+// A matching size alone does not prove matching content — a chunk can be
+// corrupted in a way that preserves its length — so the checksum is computed
+// on both sides too, and the caller's result can state that the file arrived
+// intact rather than merely that it is the right length.
+func (s *Session) verifyUpload(remotePath string, data []byte, timeout time.Duration) (remote, local string, err error) {
+	got, err := s.SizeOf(remotePath, timeout)
+	if err != nil {
+		return "", "", err
+	}
+	if got != int64(len(data)) {
+		return "", "", fmt.Errorf("size mismatch: sent %d bytes, %s has %d",
+			len(data), remotePath, got)
+	}
+	// The checksum read's own failure does not fail the transfer: the size
+	// already matched, and an unreadable checksum says checksum_match=false
+	// rather than throwing away a transfer that arrived.
+	local = Sha256Prefix(data)
+	remote, _ = s.SHA256Prefix(remotePath, timeout)
+	return remote, local, nil
 }
 
 // putBytesOverBase64 uploads through the terminal, in base64 chunks.
@@ -255,31 +269,18 @@ func (s *Session) putBytesOverBase64(data []byte, remotePath string, timeout tim
 		chunks++
 	}
 
-	// Decode into place and verify the size, so a truncated transfer is caught
-	// here rather than by whatever later tries to use the file.
+	// Decode into place, drop the artefact, and verify the size, so a
+	// truncated transfer is caught here rather than by whatever later tries
+	// to use the file.
 	if _, _, _, err := s.Run(fmt.Sprintf("base64 -d %s > %s", qTmp, qRemote), timeout); err != nil {
 		return nil, err
 	}
-	out, _, _, err := s.Run(fmt.Sprintf("wc -c < %s | tr -d ' '", qRemote), timeout)
+	s.Run(fmt.Sprintf("rm -f %s", qTmp), timeout)
+
+	remote, local, err := s.verifyUpload(remotePath, data, timeout)
 	if err != nil {
 		return nil, err
 	}
-	got := 0
-	fmt.Sscanf(strings.TrimSpace(out), "%d", &got)
-	s.Run(fmt.Sprintf("rm -f %s", qTmp), timeout)
-
-	if got != len(data) {
-		return nil, fmt.Errorf("size mismatch: sent %d bytes, %s has %d",
-			len(data), remotePath, got)
-	}
-	sum, _, _, _ := s.Run(fmt.Sprintf("sha256sum %s | cut -c1-16", qRemote), timeout)
-
-	// A matching size does not prove matching content: a chunk could have been
-	// corrupted in a way that preserved its length. The checksum is computed
-	// on both sides and compared, so the result can state that the file
-	// arrived intact rather than merely that it is the right length.
-	local := Sha256Prefix(data)
-	remote := strings.TrimSpace(sum)
 
 	return &TransferResult{
 		Asset: s.asset, RemotePath: remotePath,
@@ -347,10 +348,6 @@ func safeRemotePath(p string) (string, error) {
 	return p, nil
 }
 
-func (s *Session) GetFile(remotePath, localPath string, timeout time.Duration) (*GetResult, error) {
-	return s.GetFileRange(remotePath, localPath, 0, 0, timeout)
-}
-
 // GetFileRange reads part of a remote file.
 //
 // offset and length are byte offsets into the file; length 0 means "to the end
@@ -365,14 +362,11 @@ func (s *Session) GetFileRange(remotePath, localPath string, offset, length int6
 	if err != nil {
 		return nil, err
 	}
-	qRemote := shellx.Quote(remotePath)
 	start := time.Now()
-	sizeOut, _, _, err := s.Run(fmt.Sprintf("wc -c < %s | tr -d ' '", qRemote), timeout)
+	avail, err := s.SizeOf(remotePath, timeout)
 	if err != nil {
 		return nil, err
 	}
-	var avail int64
-	fmt.Sscanf(strings.TrimSpace(sizeOut), "%d", &avail)
 	if avail <= 0 {
 		return nil, fmt.Errorf("%s is empty or missing", remotePath)
 	}
@@ -391,7 +385,9 @@ func (s *Session) GetFileRange(remotePath, localPath string, offset, length int6
 
 	// The host's checksum for the file, taken before the read so that a file
 	// changing under us shows up as a mismatch rather than as a silent lie.
-	remoteSum, _, _, _ := s.Run(fmt.Sprintf("sha256sum %s | cut -c1-16", qRemote), timeout)
+	// A read that fails here leaves an empty checksum, which the comparison
+	// below reports as a mismatch rather than as a silent success.
+	remoteSum, _ := s.SHA256Prefix(remotePath, timeout)
 
 	raw, err := s.backend.PullBytes(remotePath, offset, want, timeout)
 	if err != nil {
