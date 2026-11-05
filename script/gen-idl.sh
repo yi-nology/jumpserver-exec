@@ -42,21 +42,31 @@ generate() {
 # entryOf 找一个 IDL 目录的入口 thrift：该目录第一份 `namespace go` 声明的
 # 包名 + .thrift。嵌套 idl/<pkg>/ 下它就是 <pkg>.thrift（旧行为）；平铺
 # idl/ 下目录名不命名包，只能问文件。
+#
+# ⚠️ 失败必须让脚本**非零退出**：`set -e` 不会把 `$(...)` 参数位置的失败
+# 传播出去（generate 拿到空串会静默 return 0），所以调用方自己 `|| exit 1`。
 entryOf() {
   local dir="$1"
   local ns
-  ns="$(grep -h '^namespace go ' "$dir"/*.thrift | head -1 | awk '{print $3}')"
+  ns="$(grep -h '^namespace go ' "$dir"/*.thrift | head -1 | awk '{print $3}')" || true
   [[ -n "$ns" ]] || { echo "⚠️  $dir 里没有 namespace go 声明" >&2; return 1; }
+  [[ -f "$dir/$ns.thrift" ]] || { echo "⚠️  $dir/$ns.thrift（入口文件）不存在" >&2; return 1; }
   echo "$dir/$ns.thrift"
+}
+
+run_dir() {
+  local idl
+  idl="$(entryOf "$1")" || exit 1
+  generate "$idl" "$ROOT/biz/model"
 }
 
 if [[ $# -gt 0 ]]; then
   for dir in "$@"; do
     [[ "$dir" = /* ]] || dir="$ROOT/$dir"
-    generate "$(entryOf "$dir")" "$ROOT/biz/model"
+    run_dir "$dir"
   done
 else
-  generate "$(entryOf "$ROOT/idl")" "$ROOT/biz/model"
+  run_dir "$ROOT/idl"
 fi
 
 echo "==> 完成；记得把重新生成的模型一起提交"
