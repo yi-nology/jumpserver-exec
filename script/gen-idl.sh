@@ -10,7 +10,7 @@
 # Thrift。slim 只出结构体和 JSON tag。
 #
 # 用法：
-#     ./script/gen-idl.sh              # 处理本仓的 idl/<包名>/
+#     ./script/gen-idl.sh              # 处理本仓的 idl/（摊平布局）
 #     ./script/gen-idl.sh <目录>...    # 处理指定的 IDL 目录
 #
 # 需要 thriftgo：
