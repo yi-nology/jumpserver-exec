@@ -404,6 +404,135 @@ func (p *GetFileResult) String() string {
 	return fmt.Sprintf("GetFileResult(%+v)", *p)
 }
 
+type PutDirResult struct {
+	Asset   *string       `thrift:"asset,1,optional" json:"asset,omitempty"`
+	Local   *string       `thrift:"local,2,optional" json:"local,omitempty"`
+	Remote  *string       `thrift:"remote,3,optional" json:"remote,omitempty"`
+	Files   *int32        `thrift:"files,4,optional" json:"files,omitempty"`
+	Bytes   *int64        `thrift:"bytes,5,optional" json:"bytes,omitempty"`
+	Seconds *float64      `thrift:"seconds,6,optional" json:"seconds,omitempty"`
+	Stats   *SessionStats `thrift:"stats,7,optional" json:"stats,omitempty"`
+	Note    *string       `thrift:"note,8,optional" json:"note,omitempty"`
+}
+
+func NewPutDirResult() *PutDirResult {
+	return &PutDirResult{}
+}
+
+func (p *PutDirResult) InitDefault() {
+}
+
+var PutDirResult_Asset_DEFAULT string
+
+func (p *PutDirResult) GetAsset() (v string) {
+	if !p.IsSetAsset() {
+		return PutDirResult_Asset_DEFAULT
+	}
+	return *p.Asset
+}
+
+var PutDirResult_Local_DEFAULT string
+
+func (p *PutDirResult) GetLocal() (v string) {
+	if !p.IsSetLocal() {
+		return PutDirResult_Local_DEFAULT
+	}
+	return *p.Local
+}
+
+var PutDirResult_Remote_DEFAULT string
+
+func (p *PutDirResult) GetRemote() (v string) {
+	if !p.IsSetRemote() {
+		return PutDirResult_Remote_DEFAULT
+	}
+	return *p.Remote
+}
+
+var PutDirResult_Files_DEFAULT int32
+
+func (p *PutDirResult) GetFiles() (v int32) {
+	if !p.IsSetFiles() {
+		return PutDirResult_Files_DEFAULT
+	}
+	return *p.Files
+}
+
+var PutDirResult_Bytes_DEFAULT int64
+
+func (p *PutDirResult) GetBytes() (v int64) {
+	if !p.IsSetBytes() {
+		return PutDirResult_Bytes_DEFAULT
+	}
+	return *p.Bytes
+}
+
+var PutDirResult_Seconds_DEFAULT float64
+
+func (p *PutDirResult) GetSeconds() (v float64) {
+	if !p.IsSetSeconds() {
+		return PutDirResult_Seconds_DEFAULT
+	}
+	return *p.Seconds
+}
+
+var PutDirResult_Stats_DEFAULT *SessionStats
+
+func (p *PutDirResult) GetStats() (v *SessionStats) {
+	if !p.IsSetStats() {
+		return PutDirResult_Stats_DEFAULT
+	}
+	return p.Stats
+}
+
+var PutDirResult_Note_DEFAULT string
+
+func (p *PutDirResult) GetNote() (v string) {
+	if !p.IsSetNote() {
+		return PutDirResult_Note_DEFAULT
+	}
+	return *p.Note
+}
+
+func (p *PutDirResult) IsSetAsset() bool {
+	return p.Asset != nil
+}
+
+func (p *PutDirResult) IsSetLocal() bool {
+	return p.Local != nil
+}
+
+func (p *PutDirResult) IsSetRemote() bool {
+	return p.Remote != nil
+}
+
+func (p *PutDirResult) IsSetFiles() bool {
+	return p.Files != nil
+}
+
+func (p *PutDirResult) IsSetBytes() bool {
+	return p.Bytes != nil
+}
+
+func (p *PutDirResult) IsSetSeconds() bool {
+	return p.Seconds != nil
+}
+
+func (p *PutDirResult) IsSetStats() bool {
+	return p.Stats != nil
+}
+
+func (p *PutDirResult) IsSetNote() bool {
+	return p.Note != nil
+}
+
+func (p *PutDirResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PutDirResult(%+v)", *p)
+}
+
 type RelayResult struct {
 	SourceAsset             string   `thrift:"source_asset,1,required" json:"source_asset"`
 	SourcePath              string   `thrift:"source_path,2,required" json:"source_path"`

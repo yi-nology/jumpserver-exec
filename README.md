@@ -132,6 +132,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | `jmsx_collect` | 一次会话采集多个事实，返回**带标签的 map** |
 | `jmsx_bg_start` / `jmsx_bg_check` | 长任务**后台化**：脱离会话跑，轮询状态与退出码 |
 | `jmsx_put_file` | 上传文件（base64 走同一条录像会话）；支持 `local_path` / `content` / `content_base64` |
+| `jmsx_put_dir` | 上传**整个目录**（tar 流走通道 stdin，合并语义：同名覆盖、不删远端已有条目）；要 `confirm=true` |
 | `jmsx_get_file` | 读文件；支持 `offset`/`length` 在**远端**取段 |
 | `jmsx_reachable` | 能不能开 shell（认证+权限+协议都要通） |
 | `jmsx_inventory` | 列堡垒机已知资产，查准确资产名 |
@@ -189,7 +190,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 │   ├── doctor/                 ← 自检：koko 接线
 │   └── tools/                  ← 工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 ├── biz/                        ← 业务
-│   ├── handler/                ← 15 个工具的实现
+│   ├── handler/                ← 16 个工具的实现
 │   ├── model/jmsexec/          ← 输出契约的生成物（thriftgo，产物入库）
 │   └── router/                 ← 装配：注册哪些工具
 ├── internal/                   ← 模块私有

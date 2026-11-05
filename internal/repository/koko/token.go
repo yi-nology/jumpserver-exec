@@ -567,6 +567,15 @@ func (t *tokenBackend) PutBytes(remotePath string, data []byte, timeout time.Dur
 // command channel. It can: the bytes go on the channel's stdin.
 func (t *tokenBackend) CanCarryBytes() bool { return true }
 
+// RunInput runs a command with a byte stream on the channel's stdin — the
+// streamed-upload shape (`tar -xf - -C dir` drinking the archive). It is the
+// generic body writeBytes uses, offered on its own for commands whose stdin
+// IS the payload.
+func (t *tokenBackend) RunInput(command string, stdin io.Reader, timeout time.Duration) (int, error) {
+	return t.runWithInput(command, stdin, timeout)
+}
+
+
 // AppendBytes writes bytes at the END of a file on the asset.
 //
 // It is the same channel as PutBytes, with `cat >>` instead of `cat >`:

@@ -53,6 +53,10 @@ var Table = reg.PolicyTable{
 		Hint: "confirm=true only when the command is classified DANGEROUS"},
 	"jmsx_put_file": {Risk: jms.Risk_destructive,
 		Confirm: "set confirm=true to write a file on the machine"},
+	// A directory upload overwrites same-name files on the machine, so it
+	// is a write like any other — unconditional confirm, like put_file.
+	"jmsx_put_dir": {Risk: jms.Risk_destructive,
+		Confirm: "set confirm=true to write files on the machine"},
 	// The relay writes a file on the DESTINATION machine, so it is a write
 	// like any other. It does not run a command, so it has nothing to
 	// classify.

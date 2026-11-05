@@ -1,6 +1,7 @@
 package koko
 
 import (
+	"io"
 	"testing"
 	"time"
 )
@@ -32,6 +33,9 @@ func (f *fakeBackend) CanCarryBytes() bool                             { return 
 func (f *fakeBackend) AppendBytes(string, []byte, time.Duration) error { return nil }
 func (f *fakeBackend) PullBytes(string, int64, int64, time.Duration) ([]byte, error) {
 	return nil, nil
+}
+func (f *fakeBackend) RunInput(string, io.Reader, time.Duration) (int, error) {
+	return 0, ErrChannelTransferUnsupported
 }
 func (f *fakeBackend) WalkDuration() time.Duration { return 0 }
 func (f *fakeBackend) Describe() string {

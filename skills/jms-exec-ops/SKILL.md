@@ -29,7 +29,7 @@ displayNames:
 | 多台机器同一条命令 | `jmsx_exec_multi`（默认并发 4） |
 | 多台机器采同一组事实 | `jmsx_collect_multi`（矩阵：行=机器，列=事实） |
 | 超过 10 分钟的长任务 | `jmsx_bg_start` + `jmsx_bg_check` + `jmsx_get_file` |
-| 上传文件 | `jmsx_put_file` |
+| 上传文件 | `jmsx_put_file`；整目录用 `jmsx_put_dir`（tar 流） |
 | 下载文件 / 只取一段 | `jmsx_get_file`（`offset` / `length`） |
 | **一台机器的文件直接传到另一台** | `jmsx_relay`（字节不经过本机） |
 | **回查这些传输在堡垒机侧的记录** | `jms_file_transfers`（管理面；谁传的/哪个文件/成没成） |

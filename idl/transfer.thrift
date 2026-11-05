@@ -74,6 +74,35 @@ struct GetFileResult {
 }
 
 /**
+ * 一次目录上传的结果（jmsx_put_dir）。
+ *
+ * 语义是**合并**：tar 解进 remote_dir，同名文件被覆盖，已有但本地没有的
+ * 条目原样保留 —— 不是「远端变成和本地一样」。整树替换请用 jmsx_exec
+ * 先清目录再传。
+ *
+ * 完整性证据是 tar 自己的退出码 + 逐文件的本地计数；目录级没有可靠的
+ * 「两边逐字节相等」的廉价判据（合并语义下远端本来就多东西）。
+ */
+struct PutDirResult {
+  /** 目标资产。 */
+  1: optional string asset,
+  /** 本地来路（被传的目录）。 */
+  2: optional string local,
+  /** 落到机器上的哪个目录。 */
+  3: optional string remote,
+  /** 传了多少个文件（目录与软链不计）。 */
+  4: optional i32 files,
+  /** tar 流的字节数。 */
+  5: optional i64 bytes,
+  /** 花了多久。 */
+  6: optional double seconds,
+  /** 这个会话的账。 */
+  7: optional session.SessionStats stats,
+  /** 一句话说明这次答复是什么（合并语义的提醒在这里）。 */
+  8: optional string note,
+}
+
+/**
  * 一次资产之间的直传（jmsx_relay）。
  *
  * 字节从源机器的通道直接进目标机器的通道，**不落本地磁盘** ——

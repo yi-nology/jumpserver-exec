@@ -31,6 +31,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -146,6 +147,15 @@ type Backend interface {
 	// through a 40-row pane in base64 chunks, while the token path reads
 	// them straight off the wire in one round trip.
 	PullBytes(remotePath string, start, total int64, timeout time.Duration) ([]byte, error)
+
+	// RunInput runs a command with a byte stream on its stdin — the shape a
+	// streamed upload needs (`tar -xf - -C dir` drinking the archive).
+	//
+	// The token backend feeds the channel's stdin; the TUI path types into
+	// a screen and cannot carry a binary stream, so it answers
+	// ErrChannelTransferUnsupported and the caller reports that honestly
+	// instead of falling back to something lossy.
+	RunInput(command string, stdin io.Reader, timeout time.Duration) (exitCode int, err error)
 
 	// WalkDuration is what opening this session cost.
 	WalkDuration() time.Duration

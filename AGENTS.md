@@ -3,7 +3,7 @@
 > 给 AI agent 的作业说明。**改这个仓的代码前先读完本页**，尤其第 1、2 节。
 
 本仓 = JumpServer 堡垒机的**执行面** MCP 服务：经堡垒机 koko(2222) 在**受管机器**上
-跑命令、传文件。**15 个工具**，一个二进制 `jumpserver-exec`。
+跑命令、传文件。**16 个工具**，一个二进制 `jumpserver-exec`。
 面向人读的完整说明在 [`README.md`](README.md)，
 **配置与排障看 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**。
 
@@ -36,7 +36,7 @@ cmd/                        # 子命令（入口层 import 的**普通包**，�
 ├── doctor/                 #   自检：koko 接线
 └── tools/                  #   工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 biz/
-├── handler/                # 15 个工具的实现
+├── handler/                # 16 个工具的实现
 ├── model/jmsexec/          # 契约的生成物（thriftgo slim 模板，产物入库）
 └── router/                 # 装配：注册哪些工具
 internal/
@@ -289,7 +289,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ### 2.10 输出形状全部是契约类型
 
-- ⚠️ **执行面 15 个工具的输出形状全部是契约类型**（`idl/`），
+- ⚠️ **执行面 16 个工具的输出形状全部是契约类型**（`idl/`），
   `render.Object` 一个不剩（`biz/handler/contract_test.go` 盯着）。
   契约类型由工具**直接产出**，不是现拼的 map —— 所以键名写错编译期就红。
 - 契约词汇：`SessionStats`（会话的账：握手多久、省了多少）、
@@ -321,16 +321,16 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ## 3. 执行面专属铁律
 
-1. **工具数是 15，**没有 REST 凭据时**是 14**。
+1. **工具数是 16，**没有 REST 凭据时**是 15**。
    `internal/service/policy/policy_test.go` 断言的是**名字集合**而不是一个数字：
-   14 个工具是固定的（`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
-   `jmsx_exec_multi` / `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_put_file` /
+   15 个工具是固定的（`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
+   `jmsx_exec_multi` / `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_put_file` / `jmsx_put_dir` /
    `jmsx_get_file` / `jmsx_relay` / `jmsx_reachable` / `jmsx_session_cost` /
    `jmsx_pool_status` / `jmsx_audit_query`），
    而 **`jmsx_inventory` 只在有 API client 时才注册**（没有 token ⇒
    `Config.APIClient()` 返回 nil ⇒ 它不存在）⇒ 所以计数是
    `want+1`（有凭据）或 `want`（没凭据）。
-   ⚠️ **口径**：对外说「15 个工具」；**没有 REST 凭据时那个数字是 14** ——
+   ⚠️ **口径**：对外说「16 个工具」；**没有 REST 凭据时那个数字是 15** ——
    别把两个数字说混，也别为了让数字好看去注册一个没凭据也能用的清单工具。
    ⚠️ 断言的是**集合**不是数字：一个改名或删除的工具，光靠计数是发现不了的。
 
@@ -341,8 +341,8 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
    `jmsx_collect` / `jmsx_collect_multi`（**条件确认** ⇒ `confirm` 是可选字段）。
    判为危险却不带标志时，工具**不执行**，而是回一句
    「classified DANGEROUS; re-call with confirm=true」—— 跟 `jms_job_run` 的 plan 同一形状。
-   `jmsx_put_file` 例外（覆盖远端文件，一律要确认）；`jmsx_relay` 也是
-   （它写的是**目标**机器）。
+   `jmsx_put_file` / `jmsx_put_dir` 例外（覆盖远端文件/目录条目，一律要确认）；
+   `jmsx_relay` 也是（它写的是**目标**机器）。
    ⚠️ 条件确认有一个好处：**门禁拒掉的那次调用有留痕**（schema 校验没先把它拒掉）。
 
 3. **`jmsx_exec_multi` 默认并发 4 台**（`concurrency` 可调，1~8）。

@@ -19,16 +19,22 @@ package koko
 // trips a caller is willing to pay for.
 
 import (
+	"archive/tar"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/oekit/concurrency/async"
+	"github.com/oekit/logx"
 	"github.com/oekit/pkg/encoding"
 	"github.com/oekit/pkg/pathx"
 	"github.com/oekit/pkg/shellx"
@@ -83,6 +89,171 @@ type TransferResult struct {
 	ChecksumMatch bool
 	Mode          string
 }
+
+// DirTransferResult is the account of one directory upload: what was
+// streamed, how much of it, and how long the stream took.
+type DirTransferResult struct {
+	Asset     string
+	LocalDir  string
+	RemoteDir string
+	Files     int
+	Bytes     int64
+	Seconds   float64
+}
+
+// PutDir uploads a local directory to a directory on the asset as one tar
+// stream on the exec channel's stdin.
+//
+// The semantics are MERGE, not mirror: the archive extracts into remoteDir,
+// overwriting same-name files and leaving everything the host already had
+// alone. A caller that wants the remote tree to become exactly the local
+// one clears the target first (jmsx_exec) and then uploads.
+//
+// There is no base64 fallback: the TUI path types into a screen and cannot
+// carry a binary stream, and a directory large enough to need this tool is
+// exactly the case where a pane-bound chunked fallback would take minutes
+// per megabyte. The caller gets the honest "this backend cannot stream"
+// error instead.
+func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*DirTransferResult, error) {
+	info, err := os.Stat(localDir)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", localDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", localDir)
+	}
+	remoteDir = strings.TrimRight(remoteDir, "/")
+	if remoteDir == "" {
+		return nil, fmt.Errorf("remote_dir is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.backend == nil || s.closed {
+		return nil, fmt.Errorf("the session is closed")
+	}
+	if !s.backend.CanCarryBytes() {
+		return nil, fmt.Errorf("directory upload needs the connection-token path; " +
+			"the koko terminal backend cannot carry a binary stream (it would take minutes per megabyte over the pane)")
+	}
+
+	// runLocked is Run's body without the lock: PutDir already holds it for
+	// the whole upload, and the streamed tar is one indivisible use of the
+	// connection — nothing else may speak on it until the extract finishes.
+	runLocked := func(command string, timeout time.Duration) (string, error) {
+		out, code, _, err := s.backend.Exec(command, timeout)
+		if err != nil {
+			return "", err
+		}
+		if code != 0 {
+			return out, fmt.Errorf("%q exited %d on %s", command, code, s.asset)
+		}
+		return out, nil
+	}
+
+	// tar on the host is the extractor; without it there is nothing to
+	// stream into. Checking first fails here, not halfway through a stream.
+	if out, err := runLocked("command -v tar >/dev/null 2>&1 || echo JMSX_NO_TAR", timeout); err != nil {
+		return nil, err
+	} else if strings.Contains(out, "JMSX_NO_TAR") {
+		return nil, fmt.Errorf("tar is not installed on %s; directory upload extracts a tar stream remotely", s.asset)
+	}
+	if _, err := runLocked("mkdir -p "+shellx.Quote(remoteDir), timeout); err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	pr, pw := io.Pipe()
+	counts := &dirTarCounts{}
+	// The tar writer runs beside the stream, not inside it (GoSafe: a panic
+	// becomes a logged stack, not a dead server). The pipe closes no matter
+	// what — on a walk error the stream ends early, the host's tar exits
+	// non-zero on the short archive, and THAT is the error the caller sees.
+	async.GoSafeLabeled("koko-dir-tar", func() {
+		defer pw.Close()
+		if err := writeDirTar(pw, localDir, counts); err != nil {
+			logx.Error("koko dir tar walk failed", "dir", localDir, "err", err)
+		}
+	})
+	code, err := s.backend.RunInput("tar -xf - -C "+shellx.Quote(remoteDir), pr, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if code != 0 {
+		return nil, fmt.Errorf("tar -xf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	}
+	return &DirTransferResult{
+		Asset:     s.asset,
+		LocalDir:  localDir,
+		RemoteDir: remoteDir,
+		Files:     counts.files,
+		Bytes:     counts.bytes,
+		Seconds:   time.Since(start).Seconds(),
+	}, nil
+}
+
+// dirTarCounts is what the tar writer tallies while it walks: the numbers
+// the result reports, collected on the sending side where the truth is.
+type dirTarCounts struct {
+	files int
+	bytes int64
+}
+
+// writeDirTar streams a tar archive of root into w, relative paths only —
+// the remote side extracts into its own directory, so nothing local leaks
+// into the layout.
+//
+// The walk order is lexical (filepath.WalkDir), so two uploads of the same
+// tree produce the same stream. Directories and symlinks are kept;
+// everything else (sockets, devices) is skipped, not fatal — a deploy
+// directory with a stray socket in it still uploads.
+func writeDirTar(w io.Writer, root string, counts *dirTarCounts) error {
+	tw := tar.NewWriter(w)
+	defer tw.Close()
+	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		name := filepath.ToSlash(rel)
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case d.IsDir():
+			return tw.WriteHeader(&tar.Header{Name: name + "/", Typeflag: tar.TypeDir, Mode: 0o755, ModTime: info.ModTime()})
+		case info.Mode()&fs.ModeSymlink != 0:
+			target, err := os.Readlink(p)
+			if err != nil {
+				return err
+			}
+			return tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeSymlink, Linkname: target, ModTime: info.ModTime()})
+		case info.Mode().IsRegular():
+			f, err := os.Open(p)
+			if err != nil {
+				return err
+			}
+			if err := tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: int64(info.Mode().Perm()), Size: info.Size(), ModTime: info.ModTime()}); err != nil {
+				f.Close()
+				return err
+			}
+			n, err := io.Copy(tw, f)
+			f.Close()
+			counts.files++
+			counts.bytes += n
+			return err
+		default:
+			return nil
+		}
+	})
+}
+
 
 func (s *Session) PutFile(localPath, remotePath string, timeout time.Duration) (*TransferResult, error) {
 	data, err := os.ReadFile(localPath)

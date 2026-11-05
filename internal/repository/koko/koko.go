@@ -355,6 +355,13 @@ func (k *Koko) AppendBytes(remotePath string, data []byte, timeout time.Duration
 	return ErrChannelTransferUnsupported
 }
 
+// RunInput is not supported on the terminal path: a typed screen cannot
+// carry a binary stream on stdin. Directory upload is honest about this
+// instead of degrading to something lossy.
+func (k *Koko) RunInput(command string, stdin io.Reader, timeout time.Duration) (int, error) {
+	return 0, ErrChannelTransferUnsupported
+}
+
 // PullBytes reads a byte range of a remote file through the pane.
 //
 // The pane is the transport, so the bytes come back in base64 chunks sized

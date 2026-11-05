@@ -8,6 +8,7 @@ import (
 func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 	registerRunTool(r, cfg)
 	registerPutFileTool(r, cfg)
+	registerPutDirTool(r, cfg)
 	registerGetFileTool(r, cfg)
 	registerRelayTool(r, cfg)
 	registerPoolStatusTool(r, cfg)

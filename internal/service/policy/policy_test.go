@@ -142,7 +142,7 @@ func TestToolCount(t *testing.T) {
 		"jmsx_exec": true, "jmsx_run": true, "jmsx_collect": true,
 		"jmsx_collect_multi": true, "jmsx_exec_multi": true,
 		"jmsx_bg_start": true, "jmsx_bg_check": true,
-		"jmsx_put_file": true, "jmsx_get_file": true, "jmsx_relay": true,
+		"jmsx_put_file": true, "jmsx_put_dir": true, "jmsx_get_file": true, "jmsx_relay": true,
 		"jmsx_reachable": true, "jmsx_session_cost": true,
 		"jmsx_pool_status": true, "jmsx_audit_query": true,
 	}

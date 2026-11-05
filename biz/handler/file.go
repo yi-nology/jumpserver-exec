@@ -145,6 +145,62 @@ func registerPutFileTool(r *reg.Registry, cfg config.Config) {
 
 }
 
+func registerPutDirTool(r *reg.Registry, cfg config.Config) {
+
+	type putDirArgs struct {
+		Asset      string `json:"asset" jsonschema:"asset name or address"`
+		LocalPath  string `json:"local_path" jsonschema:"directory on this machine to upload"`
+		RemotePath string `json:"remote_path" jsonschema:"destination directory on the asset; created if missing"`
+		Timeout    int    `json:"timeout,omitempty" jsonschema:"seconds per internal step (default 300)"`
+		Confirm    bool   `json:"confirm" jsonschema:"must be true; this writes files on the machine, overwriting same-name ones"`
+	}
+
+	reg.Add(r, &mcp.Tool{
+		Name: "jmsx_put_dir",
+		Description: "Upload a whole LOCAL directory to an asset through the bastion, as one tar stream on the recorded session's channel. " +
+			"Use it to deploy a config tree, a script bundle or a small application directory in one call instead of one jmsx_put_file per file. " +
+			"The semantics are MERGE, not mirror: the archive extracts into the destination, overwriting same-name files and leaving " +
+			"everything the host already had alone — to make the remote tree exactly the local one, clear the destination first " +
+			"(jmsx_exec) and then upload. Requires the connection-token path and tar on the asset; the koko terminal backend " +
+			"answers honestly that it cannot stream a binary payload.",
+		OutputSchema: render.Schema[jmsexec.PutDirResult]()}, func(ctx context.Context, _ *mcp.CallToolRequest, args putDirArgs) (*mcp.CallToolResult, any, error) {
+		if strings.TrimSpace(args.LocalPath) == "" {
+			return render.Failf("local_path is required")
+		}
+		if strings.TrimSpace(args.RemotePath) == "" {
+			return render.Failf("remote_path is required")
+		}
+		timeout := commandTimeout(args.Timeout, 300)
+
+		s, err := koko.OpenSession(ctx, cfg.Koko, args.Asset, timeout+120*time.Second)
+		if err != nil {
+			return fail(err)
+		}
+		defer s.Close()
+
+		res, err := s.PutDir(args.LocalPath, args.RemotePath, timeout)
+		if err != nil {
+			// The typed error, not its text: a half-extracted directory is
+			// exactly the case where the caller has to know whether the
+			// bytes reached the machine (see jmsx_exec).
+			return fail(err)
+		}
+		out := &jmsexec.PutDirResult{
+			Asset:   jms.Opt(res.Asset),
+			Local:   jms.Opt(res.LocalDir),
+			Remote:  jms.Opt(res.RemoteDir),
+			Files:   jms.OptInt32(int32(res.Files)),
+			Bytes:   jms.OptInt64(res.Bytes),
+			Seconds: jms.OptFloat64(res.Seconds),
+			Stats:   s.Stats(),
+			Note: jms.Opt("merge semantics: same-name files were overwritten, entries the host already had are untouched. " +
+				"To mirror the local tree exactly, clear the destination first"),
+		}
+		return render.Text(out)
+	})
+
+}
+
 func registerGetFileTool(r *reg.Registry, cfg config.Config) {
 
 	type getArgs struct {

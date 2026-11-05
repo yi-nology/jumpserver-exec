@@ -369,6 +369,38 @@
         "type": "object",
         "additionalProperties": false
       },
+      "ToolInput_jmsx_put_dir": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "local_path": {
+            "type": "string",
+            "description": "directory on this machine to upload"
+          },
+          "remote_path": {
+            "type": "string",
+            "description": "destination directory on the asset; created if missing"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per internal step (default 300)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true; this writes files on the machine, overwriting same-name ones"
+          }
+        },
+        "required": [
+          "asset",
+          "local_path",
+          "remote_path",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
       "ToolInput_jmsx_put_file": {
         "type": "object",
         "properties": {
@@ -2033,6 +2065,119 @@
         ],
         "additionalProperties": true
       },
+      "ToolOutput_jmsx_put_dir": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "local": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "remote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "files": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "bytes": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
       "ToolOutput_jmsx_put_file": {
         "type": "object",
         "properties": {
@@ -2658,6 +2803,21 @@
             "properties": {
               "structured": {
                 "$ref": "#/components/schemas/ToolOutput_jmsx_pool_status"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_put_dir": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_put_dir"
               }
             },
             "type": "object"
@@ -3420,6 +3580,65 @@
           }
         },
         "summary": "调用工具 jmsx_pool_status"
+      }
+    },
+    "/api/v1/tools/jmsx_put_dir/invoke": {
+      "post": {
+        "description": "[risk: destructive] Upload a whole LOCAL directory to an asset through the bastion, as one tar stream on the recorded session's channel. Use it to deploy a config tree, a script bundle or a small application directory in one call instead of one jmsx_put_file per file. The semantics are MERGE, not mirror: the archive extracts into the destination, overwriting same-name files and leaving everything the host already had alone — to make the remote tree exactly the local one, clear the destination first (jmsx_exec) and then upload. Requires the connection-token path and tar on the asset; the koko terminal backend answers honestly that it cannot stream a binary payload.（需确认：set confirm=true to write files on the machine）",
+        "operationId": "invoke_jmsx_put_dir",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_put_dir"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_put_dir"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_put_dir"
       }
     },
     "/api/v1/tools/jmsx_put_file/invoke": {
