@@ -575,6 +575,14 @@ func (t *tokenBackend) RunInput(command string, stdin io.Reader, timeout time.Du
 	return t.runWithInput(command, stdin, timeout)
 }
 
+// RunOutput is RunInput's mirror: the command's stdout streams straight into
+// the caller's writer (`tar -cf - -C dir` writing the archive onto it), so a
+// directory download never holds the whole archive in memory. The stderr is
+// discarded into a bounded buffer for the error message only.
+func (t *tokenBackend) RunOutput(command string, stdout io.Writer, timeout time.Duration) (int, error) {
+	var stderr bytes.Buffer
+	return t.run(command, nil, stdout, &stderr, timeout)
+}
 
 // AppendBytes writes bytes at the END of a file on the asset.
 //

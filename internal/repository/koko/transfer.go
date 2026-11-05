@@ -99,6 +99,22 @@ type DirTransferResult struct {
 	Files     int
 	Bytes     int64
 	Seconds   float64
+	// Skipped is how many entries the tar stream LEFT BEHIND (sockets and
+	// devices cannot cross it). Zero does not appear in the answer; a
+	// non-zero count means the remote tree is SMALLER than the local one.
+	Skipped int
+	// Note carries the skipped entries' names (and the verification
+	// verdict) when there is anything to say.
+	Note string
+	// Verified is the arrival proof: every file the local side hashed was
+	// checked on the host against a sha256 manifest that rode the same
+	// stream, and every digest matched. A transfer that cannot prove
+	// arrival (no sha256sum on the host, manifest lost in extraction)
+	// reports verified=false WITH the reason in Note — a fake true is the
+	// one answer this field must never give.
+	Verified bool
+	// VerifiedFiles is how many digests the host checked.
+	VerifiedFiles int
 }
 
 // PutDir uploads a local directory to a directory on the asset as one tar
@@ -174,12 +190,177 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 			logx.Error("koko dir tar walk failed", "dir", localDir, "err", err)
 		}
 	})
-	code, err := s.backend.RunInput("tar -xf - -C "+shellx.Quote(remoteDir), pr, timeout)
+	// The deadline scales with the tree: a FIXED timeout kills a large
+	// directory on a slow link mid-stream (and mid-extract). After the walk
+	// finishes, counts.bytes is the size the tree actually had; the stream
+	// gets base + bytes at a floor rate of 512 KiB/s, capped at 4x base —
+	// beyond that the caller names their own timeout (the note says so).
+	streamTimeout := dirStreamTimeout(timeout, counts.bytes)
+	code, err := s.backend.RunInput("tar -xf - -C "+shellx.Quote(remoteDir), pr, streamTimeout)
 	if err != nil {
 		return nil, err
 	}
 	if code != 0 {
 		return nil, fmt.Errorf("tar -xf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	}
+	// Arrival proof (issue: 别让目录传输成为唯一不证明到达完整性的传输工具
+	// —— jmsx_put_file 的纪律在目录上的等价物): the manifest rode the
+	// stream, the host checks it with sha256sum -c, exit 0 means EVERY file
+	// the local side hashed arrived with those exact bytes. The manifest is
+	// deleted after the check. No sha256sum on the host (or no files) ⇒ the
+	// check is skipped and the answer says so — an honest absence, not a
+	// fake verified=true.
+	verified := false
+	verifiedFiles := 0
+	verifyNote := ""
+	if len(counts.manifest) > 0 {
+		if out, err := runLocked("command -v sha256sum >/dev/null 2>&1 || echo JMSX_NO_SHA", timeout); err != nil {
+			return nil, err
+		} else if strings.Contains(out, "JMSX_NO_SHA") {
+			verifyNote = "sha256sum is not installed on " + s.asset + "; the manifest was uploaded but not verified"
+		} else {
+			manifestName := latestManifestName(remoteDir, runLocked, timeout)
+			if manifestName == "" {
+				verifyNote = "the manifest did not extract; arrival could not be verified"
+			} else {
+				checkCmd := "cd " + shellx.Quote(remoteDir) + " && sha256sum -c " + shellx.Quote(manifestName) + " --quiet; status=$?; rm -f " + shellx.Quote(remoteDir+"/"+manifestName) + "; exit $status"
+				if _, err := runLocked(checkCmd, timeout); err != nil {
+					return nil, fmt.Errorf("arrival verification FAILED (some files do not match the manifest): %w", err)
+				}
+				verified = true
+				verifiedFiles = len(counts.manifest)
+				verifyNote = fmt.Sprintf("all %d files verified against the sha256 manifest", verifiedFiles)
+			}
+		}
+	}
+	note := verifyNote
+	if counts.skipped > 0 {
+		skip := fmt.Sprintf("%d entr%s did not travel (sockets/devices cannot cross a tar stream): %s — "+ //shellquote:ok
+			"for a directory well beyond the default window pass an explicit timeout", counts.skipped, ifPlural(counts.skipped), strings.Join(counts.skippedNames, ", "))
+		if note != "" {
+			note = skip + "; " + note
+		} else {
+			note = skip
+		}
+	}
+	return &DirTransferResult{
+		Asset:         s.asset,
+		LocalDir:      localDir,
+		RemoteDir:     remoteDir,
+		Files:         counts.files,
+		Bytes:         counts.bytes,
+		Seconds:       time.Since(start).Seconds(),
+		Skipped:       counts.skipped,
+		Note:          note,
+		Verified:      verified,
+		VerifiedFiles: verifiedFiles,
+	}, nil
+}
+
+// latestManifestName finds the manifest entry the stream just extracted:
+// the one .jmsx-manifest-* file in the remote dir with the newest mtime.
+// An empty answer means it did not extract — the caller reports that
+// instead of pretending the check ran.
+func latestManifestName(remoteDir string, runLocked func(string, time.Duration) (string, error), timeout time.Duration) string {
+	out, err := runLocked("ls -1t "+shellx.Quote(remoteDir)+"/"+".jmsx-manifest-* 2>/dev/null | head -1", timeout)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// dirStreamTimeout is the stream deadline for a directory upload: the base
+// the caller asked for, plus the tree's size at a floor rate of
+// 512 KiB/s (a conservative link), capped at 4x base — a caller moving
+// more than that names its own timeout.
+func dirStreamTimeout(base time.Duration, bytes int64) time.Duration {
+	scaled := base + time.Duration(bytes/(512*1024))*time.Second
+	if scaled > 4*base {
+		return 4 * base
+	}
+	return scaled
+}
+
+// ifPlural is "y"/"ies" for a count of one/many.
+func ifPlural(n int) string {
+	if n == 1 {
+		return "y"
+	}
+	return "ies"
+}
+
+// GetDir downloads a directory from the asset as one tar stream on the exec
+// channel's stdout, extracted HERE as it arrives — the mirror of PutDir, and
+// the honest answer to "agent 要拉回一个远端目录" that until now meant
+// hand-rolled tar|base64 over jmsx_exec or a jmsx_get_file per file.
+//
+// Same channel discipline as PutDir: the connection-token path only (the
+// TUI pane cannot carry a binary stream — the error says so, not a slow
+// fallback), and the streamed tar is one indivisible use of the connection.
+//
+// Extraction is defensive: an entry whose name is absolute or climbs out of
+// the destination ("..", "../x", "/etc/passwd") is SKIPPED and counted, not
+// followed — a hostile tar must not write outside local_dir. Same merge
+// semantics as PutDir: same-name files are overwritten, everything else the
+// destination already had is untouched.
+func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*DirTransferResult, error) {
+	remoteDir = strings.TrimRight(remoteDir, "/")
+	if remoteDir == "" {
+		return nil, fmt.Errorf("remote_dir is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.backend == nil || s.closed {
+		return nil, fmt.Errorf("the session is closed")
+	}
+	if !s.backend.CanCarryBytes() {
+		return nil, fmt.Errorf("directory download needs the connection-token path; " +
+			"the koko terminal backend cannot carry a binary stream (it would take minutes per megabyte over the pane)")
+	}
+
+	runLocked := func(command string, timeout time.Duration) (string, error) {
+		out, code, _, err := s.backend.Exec(command, timeout)
+		if err != nil {
+			return "", err
+		}
+		if code != 0 {
+			return out, fmt.Errorf("%q exited %d on %s", command, code, s.asset)
+		}
+		return out, nil
+	}
+	if out, err := runLocked("command -v tar >/dev/null 2>&1 || echo JMSX_NO_TAR", timeout); err != nil {
+		return nil, err
+	} else if strings.Contains(out, "JMSX_NO_TAR") {
+		return nil, fmt.Errorf("tar is not installed on %s; directory download streams a tar archive remotely", s.asset)
+	}
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
+		return nil, fmt.Errorf("mkdir %s: %w", localDir, err)
+	}
+
+	start := time.Now()
+	pr, pw := io.Pipe()
+	counts := &dirTarCounts{}
+	// The extractor runs beside the stream, not inside it (GoSafe: a panic
+	// becomes a logged stack, not a dead server). The pipe closes no matter
+	// what — on an extract error the reader stops, the remote tar dies on
+	// the broken pipe, and THAT is the error the caller sees.
+	async.GoSafeLabeled("koko-dir-untar", func() {
+		defer pw.Close()
+		if err := readDirTar(pr, localDir, counts); err != nil {
+			logx.Error("koko dir extract failed", "dir", localDir, "err", err)
+		}
+	})
+	code, err := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" .", pw, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if code != 0 {
+		return nil, fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	}
+	note := ""
+	if counts.skipped > 0 {
+		note = fmt.Sprintf("%d entr%s skipped while extracting (outside the destination, or not a file/dir/symlink): %s",
+			counts.skipped, ifPlural(counts.skipped), strings.Join(counts.skippedNames, ", "))
 	}
 	return &DirTransferResult{
 		Asset:     s.asset,
@@ -188,14 +369,98 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 		Files:     counts.files,
 		Bytes:     counts.bytes,
 		Seconds:   time.Since(start).Seconds(),
+		Skipped:   counts.skipped,
+		Note:      note,
 	}, nil
+}
+
+// readDirTar extracts a tar stream into root as it arrives, counting what
+// it wrote and what it refused. An entry whose name is absolute or climbs
+// out of root is skipped (counted, named) — never followed.
+func readDirTar(r io.Reader, root string, counts *dirTarCounts) error {
+	tr := tar.NewReader(r)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		name := hdr.Name
+		if !safeExtractPath(root, name) {
+			counts.skipped++
+			if len(counts.skippedNames) < 3 {
+				counts.skippedNames = append(counts.skippedNames, name)
+			}
+			// Drain the body so the stream stays aligned.
+			_, _ = io.Copy(io.Discard, tr)
+			continue
+		}
+		dest := filepath.Join(root, filepath.FromSlash(name))
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			_ = os.MkdirAll(filepath.Dir(dest), 0o755)
+			_ = os.Remove(dest)
+			if err := os.Symlink(hdr.Linkname, dest); err != nil {
+				return err
+			}
+			counts.files++
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(hdr.Mode)&0o777)
+			if err != nil {
+				return err
+			}
+			n, err := io.Copy(f, tr)
+			f.Close()
+			if err != nil {
+				return err
+			}
+			counts.files++
+			counts.bytes += n
+		default:
+			counts.skipped++
+			if len(counts.skippedNames) < 3 {
+				counts.skippedNames = append(counts.skippedNames, name)
+			}
+		}
+	}
+}
+
+// safeExtractPath refuses an archive entry that would write outside root:
+// absolute names and any climb through "..". Everything else is fine.
+func safeExtractPath(root, name string) bool {
+	if strings.HasPrefix(name, "/") || filepath.IsAbs(name) {
+		return false
+	}
+	clean := filepath.Clean(filepath.Join(root, filepath.FromSlash(name)))
+	rootClean, err := filepath.Abs(root)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(clean+string(os.PathSeparator), rootClean+string(os.PathSeparator)) || clean == rootClean
 }
 
 // dirTarCounts is what the tar writer tallies while it walks: the numbers
 // the result reports, collected on the sending side where the truth is.
+// Skipped carries what the stream LEFT BEHIND — a silent skip is a tree
+// that arrives smaller than it left, and the caller must be able to see it.
 type dirTarCounts struct {
-	files int
-	bytes int64
+	files        int
+	bytes        int64
+	skipped      int
+	skippedNames []string // the first few, for the note
+	// manifest carries one "sha256  relative/path" line per regular file,
+	// in walk order — the material the remote verification (sha256sum -c)
+	// consumes. Empty when the caller asked for no manifest.
+	manifest []string
 }
 
 // writeDirTar streams a tar archive of root into w, relative paths only —
@@ -208,7 +473,20 @@ type dirTarCounts struct {
 // directory with a stray socket in it still uploads.
 func writeDirTar(w io.Writer, root string, counts *dirTarCounts) error {
 	tw := tar.NewWriter(w)
+	// After the tree, the manifest itself goes on the stream as one more
+	// entry (jmsx_put_dir's arrival proof): the remote side checks it with
+	// sha256sum -c and deletes it. sha256sum 格式: "<hex>  <path>", two
+	// spaces, path exactly as archived.
 	defer tw.Close()
+	defer func() {
+		if len(counts.manifest) == 0 {
+			return
+		}
+		name := fmt.Sprintf(".jmsx-manifest-%d", time.Now().UnixNano())
+		body := strings.Join(counts.manifest, "\n") + "\n"
+		_ = tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o600, Size: int64(len(body)), ModTime: time.Now()})
+		_, _ = tw.Write([]byte(body))
+	}()
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -243,17 +521,28 @@ func writeDirTar(w io.Writer, root string, counts *dirTarCounts) error {
 				f.Close()
 				return err
 			}
-			n, err := io.Copy(tw, f)
+			// The digest is computed WHILE the bytes stream (a TeeWriter
+			// around the tar entry) — a second read of the file would be a
+			// second truth, and a file changing between the two reads is
+			// exactly what a manifest must not hide.
+			h := sha256.New()
+			n, err := io.Copy(io.MultiWriter(tw, h), f)
 			f.Close()
 			counts.files++
 			counts.bytes += n
+			counts.manifest = append(counts.manifest, fmt.Sprintf("%x  %s", h.Sum(nil), name))
 			return err
 		default:
+			// Sockets and devices cannot travel a tar stream. Skip, but
+			// COUNT: "2 entries did not travel" is a fact the caller owns.
+			counts.skipped++
+			if len(counts.skippedNames) < 3 {
+				counts.skippedNames = append(counts.skippedNames, name)
+			}
 			return nil
 		}
 	})
 }
-
 
 func (s *Session) PutFile(localPath, remotePath string, timeout time.Duration) (*TransferResult, error) {
 	data, err := os.ReadFile(localPath)
@@ -773,6 +1062,171 @@ type RelayResult struct {
 	SourceSHA256  string
 	DestSHA256    string
 	ChecksumMatch bool
+}
+
+// DirRelayResult is the outcome of a directory copy from one asset to
+// another.
+type DirRelayResult struct {
+	SourceAsset string
+	SourcePath  string
+	DestAsset   string
+	DestPath    string
+	// Bytes is what the archive actually streamed (the transfer's own
+	// count, not an estimate).
+	Bytes   int64
+	Seconds float64
+	// Note carries the merge-semantics reminder and anything else the
+	// caller should read before trusting the copy.
+	Note string
+}
+
+// RelayDir copies a whole directory from one asset to another: the source's
+// `tar -cf -` writes onto the destination's `tar -xf -` through one pipe in
+// this process — the archive never touches the local disk, the same
+// machine-to-machine discipline as Relay (a directory that never lands here
+// cannot be left half-copied here).
+//
+// It needs the connection-token backend on BOTH ends (RunOutput is the one
+// direction the terminal pane cannot do) and tar on both machines. The
+// semantics on the destination are MERGE, the same as PutDir: same-name
+// files are overwritten, entries the destination already had are untouched.
+// The archive streams straight through, so there is no arrival proof here —
+// a caller that needs one runs a sha256 check itself (jmsx_exec) or moves
+// the tree in two honest hops (GetDir then PutDir), which DOES verify.
+func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstPath string, timeout time.Duration) (*DirRelayResult, error) {
+	started := time.Now()
+
+	// Same identity rule as Relay: one machine spelled two ways must not
+	// stream a tree onto itself (tar reading and writing the same tree
+	// concurrently is a corruption nobody can audit).
+	srcRef, err := resolveAsset(ctx, cfg, srcAsset)
+	if err != nil {
+		return nil, err
+	}
+	dstRef, err := resolveAsset(ctx, cfg, dstAsset)
+	if err != nil {
+		return nil, err
+	}
+	if srcRef.ID == dstRef.ID {
+		return nil, fmt.Errorf("the source and the destination are the same machine (%s); "+
+			"streaming a directory onto itself is a corruption nobody can audit", srcRef.Name)
+	}
+	srcPath, err = safeRemotePath(srcPath)
+	if err != nil {
+		return nil, err
+	}
+	dstPath, err = safeRemotePath(dstPath)
+	if err != nil {
+		return nil, err
+	}
+
+	src, err := OpenSession(ctx, cfg, srcAsset, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("open the source session on %s: %w", srcAsset, err)
+	}
+	defer src.Close()
+	dst, err := OpenSession(ctx, cfg, dstAsset, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("open the destination session on %s: %w", dstAsset, err)
+	}
+	defer dst.Close()
+
+	if !src.CanCarryBytes() || !dst.CanCarryBytes() {
+		return nil, fmt.Errorf("relaying a directory needs the connection-token backend on both ends; " +
+			"the koko terminal path cannot stream binary output")
+	}
+
+	// The destination needs tar to extract and a directory to extract into.
+	// Checked FIRST so the failure lands before any byte moves.
+	if out, _, _, err := dst.Run("command -v tar >/dev/null 2>&1 || echo JMSX_NO_TAR", timeout); err != nil {
+		return nil, err
+	} else if strings.Contains(out, "JMSX_NO_TAR") {
+		return nil, fmt.Errorf("tar is not installed on %s; a directory relay extracts the stream remotely", dstAsset)
+	}
+	if _, _, _, err := dst.Run("mkdir -p "+shellx.Quote(dstPath), timeout); err != nil {
+		return nil, err
+	}
+	if _, _, _, err := src.Run("command -v tar >/dev/null 2>&1 || echo JMSX_NO_TAR", timeout); err != nil {
+		return nil, err
+	}
+
+	pr, pw := io.Pipe()
+	var streamed int64
+	var streamErr error
+	// The source streams beside the copy, not inside it: RunOutput holds the
+	// source's channel for the whole archive, and nothing else may speak on
+	// it until the destination has drunk the last byte. Each side's own
+	// session lock covers its channel — the two locks never cross.
+	// GoSafe, not a bare goroutine — the same rule PutDir's tar writer
+	// follows: a panic in a stream feeder is a logged stack, not a dead
+	// server.
+	async.GoSafeLabeled("koko-relay-dir-src", func() {
+		defer pw.Close()
+		code, err := src.runOutputLocked("tar -cf - -C "+shellx.Quote(srcPath)+" .", pw, timeout)
+		if err != nil {
+			streamErr = fmt.Errorf("tar -cf - -C %s on %s: %w", srcPath, srcAsset, err)
+			return
+		}
+		if code != 0 {
+			streamErr = fmt.Errorf("tar -cf - -C %s on %s exited %d", srcPath, srcAsset, code)
+		}
+	})
+	// The bridge counts what actually crossed: the transfer's own number,
+	// not a size measured up front (a size that changed mid-stream is
+	// exactly what a recount catches).
+	streamed, err = runInputCounting(dst, "tar -xf - -C "+shellx.Quote(dstPath), pr, timeout)
+	if err != nil {
+		return nil, err
+	}
+	if streamErr != nil {
+		return nil, streamErr
+	}
+	return &DirRelayResult{
+		SourceAsset: srcAsset,
+		SourcePath:  srcPath,
+		DestAsset:   dstAsset,
+		DestPath:    dstPath,
+		Bytes:       streamed,
+		Seconds:     time.Since(started).Seconds(),
+		Note: "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
+			"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven",
+	}, nil
+}
+
+// runInputCounting is RunInput with a counting reader in front: how many
+// bytes the destination actually drank.
+func runInputCounting(s *Session, command string, r io.Reader, timeout time.Duration) (int64, error) {
+	cr := &countingReader{r: r}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.backend == nil || s.closed {
+		return 0, fmt.Errorf("the session is closed")
+	}
+	_, err := s.backend.RunInput(command, cr, timeout)
+	return cr.n, err
+}
+
+type countingReader struct {
+	r io.Reader
+	n int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// runOutputLocked is RunOutput under the session's own lock: a streamed
+// archive is one indivisible use of the channel (the same rule PutDir's
+// runLocked applies to RunInput).
+func (s *Session) runOutputLocked(command string, w io.Writer, timeout time.Duration) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.backend == nil || s.closed {
+		return 0, fmt.Errorf("the session is closed")
+	}
+	return s.backend.RunOutput(command, w, timeout)
 }
 
 // relayChunkBytes is how many bytes travel in one hop.

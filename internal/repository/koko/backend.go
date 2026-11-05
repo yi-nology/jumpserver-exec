@@ -157,6 +157,13 @@ type Backend interface {
 	// instead of falling back to something lossy.
 	RunInput(command string, stdin io.Reader, timeout time.Duration) (exitCode int, err error)
 
+	// RunOutput is RunInput's mirror: a command whose STDOUT is the payload
+	// (`tar -cf - -C dir` writing the archive), streamed straight into the
+	// writer — a directory download never holds the whole archive in
+	// memory. Same honesty rule as RunInput: the TUI path answers
+	// ErrChannelTransferUnsupported.
+	RunOutput(command string, stdout io.Writer, timeout time.Duration) (exitCode int, err error)
+
 	// WalkDuration is what opening this session cost.
 	WalkDuration() time.Duration
 
