@@ -210,6 +210,9 @@ jmsx_get_file {"asset":"192.0.2.71","remote_path":"/tmp/deploy.log"}
 # 从本机传
 jmsx_put_file {"asset":"node-071","local_path":"/tmp/deploy.sh","remote_path":"/opt/app/deploy.sh","mode":700,"confirm":true}
 
+# 整目录一次传（合并语义：同名覆盖、远端已有保留；要整树镜像先清目录）
+jmsx_put_dir {"asset":"node-071","local_path":"/tmp/app-bundle","remote_path":"/opt/app","confirm":true}
+
 # 内容已经在手上（不必先落本地文件）
 jmsx_put_file {"asset":"node-071","remote_path":"/opt/app/conf.yaml","content":"key: value\n","confirm":true}
 jmsx_put_file {"asset":"node-071","remote_path":"/tmp/x.bin","content_base64":"<base64>","confirm":true}
