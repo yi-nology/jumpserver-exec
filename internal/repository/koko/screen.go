@@ -189,7 +189,7 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 	seen := map[int]int{}
 	code := -1
 
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		for _, col := range cleanFrameColumns(line) {
 			// The candidates that are rows of THIS command. The ones that
 			// are not — a piece of the output that happens to look like
@@ -200,24 +200,26 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 			// Every candidate is tried, in order: trying only the first
 			// would turn "a fragment took the row's place" into "the row
 			// is gone" — the same wrong answer in the other direction.
-			var ours []rowCandidate
-			for _, cand := range numberedCandidates(col) {
-				mt := numberedLine.FindStringSubmatch(col[cand.start:])
-				if mt == nil {
-					continue
-				}
-				if !rowIsOurs(mt, minEpoch) {
-					continue
-				}
-				ours = append(ours, cand)
+			//
+			// The walk is ONE regex pass per candidate (submatch indexes,
+			// not strings): this scan is the hot loop of the settle poll,
+			// which re-scans the whole capture every 250 ms, and the
+			// submatch-strings form costs three scans of the same text
+			// where one suffices.
+			type cand struct {
+				start int   // where the row's prefix begins, in col
+				loc   []int // numberedLine.FindStringSubmatchIndex on col[start:]
 			}
-			for ci, cand := range ours {
-				start := cand.start
-				loc := numberedLine.FindStringSubmatchIndex(col[start:])
-				if loc == nil {
-					continue
+			var ours []cand
+			for i := 0; i < len(col); {
+				end := segmentEnd(col, i)
+				if loc := numberedLine.FindStringSubmatchIndex(col[i:end]); loc != nil && rowIsOursAt(col, i, loc, minEpoch) {
+					ours = append(ours, cand{i, loc})
 				}
-				mt := numberedLine.FindStringSubmatch(col[start:])
+				i = end
+			}
+			for ci, c := range ours {
+				start := c.start
 				// The text ends where the NEXT row of this command begins,
 				// or where the terminal moves the cursor to the next line —
 				// so the content of another pane row cannot end up in this
@@ -225,28 +227,24 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 				end := len(col)
 				if ci+1 < len(ours) {
 					end = ours[ci+1].start
-				} else if c := cursorMoveIndex(col[start:]); c >= 0 {
-					end = start + c
+				} else if cm := cursorMoveIndex(col[start:]); cm >= 0 {
+					end = start + cm
 				}
-				text := stripANSI(col[start+loc[6] : end])
-				// The row is ours (rowIsOurs said so); the key is what
-				// orders the rows and tells two paints of the same row
-				// apart.
-				key := mt[1]
-				if mt[2] != "" {
-					key = mt[1] + "-" + mt[2]
+				text := stripANSI(col[start+c.loc[6] : end])
+				// The sort key: epoch*lineEpochStride+idx when the row
+				// carries an epoch, the plain number otherwise (the
+				// epochless form only survives when the caller does not
+				// know the epoch — minEpoch == 0 — which is the tests).
+				// Sorting numerically on it keeps every command in order
+				// while making the numbering unique across the session.
+				ep, errEp := strconv.Atoi(col[start+c.loc[2] : start+c.loc[3]])
+				idx := 0
+				if c.loc[4] >= 0 {
+					idx, _ = strconv.Atoi(col[start+c.loc[4] : start+c.loc[5]])
 				}
-				// Sorting numerically on the combined key keeps every command in
-				// order while making the numbering unique across the session.
-				n := 0
-				if _, err := fmt.Sscanf(key, "%d-%d", &n, new(int)); err != nil {
-					n = 0
-					fmt.Sscanf(key, "%d", &n)
-				}
-				if mt[2] != "" {
-					idx := 0
-					fmt.Sscanf(mt[2], "%d", &idx)
-					n = n*lineEpochStride + idx
+				n := ep
+				if c.loc[4] >= 0 && errEp == nil {
+					n = ep*lineEpochStride + idx
 				}
 				if rc, ok := strings.CutPrefix(text, m.rc); ok {
 					if code < 0 {
@@ -277,8 +275,6 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 					}
 					continue
 				}
-				idx := 0
-				fmt.Sscanf(mt[2], "%d", &idx)
 				seen[n] = len(rows)
 				rows = append(rows, row{n, idx, trimmed})
 			}
@@ -359,13 +355,17 @@ func cursorMoveIndex(s string) int {
 	return loc[0]
 }
 
-// rowIsOurs says whether a numbered row belongs to this command.
+// rowIsOursAt says whether a numbered row belongs to this command.
+//
+// loc is numberedLine.FindStringSubmatchIndex's result on the segment that
+// starts at base in col; it is the index form of what rowIsOurs used to take
+// as strings, so the hot scan never materialises the submatch strings.
 //
 // Every row this tool writes carries the epoch of the command that wrote
-// it, so a row WITHOUT an epoch is not one of ours: it can only be a piece
-// of the output that happens to look like a row (a colour-highlighted
-// "2024@foo", say), and letting it in would replace the real row with a
-// fragment of the output — silently.
+// it, so a row WITHOUT an epoch (group 2 absent) is not one of ours: it can
+// only be a piece of the output that happens to look like a row (a
+// colour-highlighted "2024@foo", say), and letting it in would replace the
+// real row with a fragment of the output — silently.
 //
 // A row with an OLDER epoch belongs to an earlier command: it is scrollback
 // on the pane, not this answer.
@@ -373,11 +373,11 @@ func cursorMoveIndex(s string) int {
 // The plain form is still accepted when the caller does not know the epoch
 // (minEpoch == 0), which is the case in the tests that pin the shape of a
 // row.
-func rowIsOurs(mt []string, minEpoch int) bool {
-	if mt[2] == "" {
+func rowIsOursAt(col string, base int, loc []int, minEpoch int) bool {
+	if loc[4] < 0 {
 		return minEpoch == 0
 	}
-	ep, err := strconv.Atoi(mt[1])
+	ep, err := strconv.Atoi(col[base+loc[2] : base+loc[3]])
 	return err == nil && ep >= minEpoch
 }
 
