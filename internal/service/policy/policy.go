@@ -34,6 +34,7 @@ var Table = reg.PolicyTable{
 	"jmsx_collect_multi": {Risk: jms.Risk_write, Conditional: true,
 		Hint: "confirm=true only when one of the commands is classified DANGEROUS"},
 	"jmsx_get_file":     {Risk: jms.Risk_read},
+	"jmsx_get_dir":      {Risk: jms.Risk_read},
 	"jmsx_bg_check":     {Risk: jms.Risk_read},
 	"jmsx_session_cost": {Risk: jms.Risk_read},
 	"jmsx_pool_status":  {Risk: jms.Risk_read},
@@ -62,4 +63,8 @@ var Table = reg.PolicyTable{
 	// classify.
 	"jmsx_relay": {Risk: jms.Risk_destructive,
 		Confirm: "set confirm=true to write a file on the destination machine"},
+	// Same verdict as jmsx_relay: the destination machine is written to
+	// (same-name files overwritten), so it rides the destructive gate.
+	"jmsx_relay_dir": {Risk: jms.Risk_destructive,
+		Confirm: "set confirm=true to write files on the destination machine"},
 }

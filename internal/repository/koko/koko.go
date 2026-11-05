@@ -362,6 +362,12 @@ func (k *Koko) RunInput(command string, stdin io.Reader, timeout time.Duration) 
 	return 0, ErrChannelTransferUnsupported
 }
 
+// RunOutput: the TUI path types into a screen and cannot stream a command's
+// binary stdout off it — same honesty rule as RunInput.
+func (k *Koko) RunOutput(command string, stdout io.Writer, timeout time.Duration) (int, error) {
+	return 0, ErrChannelTransferUnsupported
+}
+
 // PullBytes reads a byte range of a remote file through the pane.
 //
 // The pane is the transport, so the bytes come back in base64 chunks sized

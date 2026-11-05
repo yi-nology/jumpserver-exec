@@ -34,6 +34,10 @@ func (f *fakeBackend) AppendBytes(string, []byte, time.Duration) error { return 
 func (f *fakeBackend) PullBytes(string, int64, int64, time.Duration) ([]byte, error) {
 	return nil, nil
 }
+func (f *fakeBackend) RunOutput(string, io.Writer, time.Duration) (int, error) {
+	return 0, nil
+}
+
 func (f *fakeBackend) RunInput(string, io.Reader, time.Duration) (int, error) {
 	return 0, ErrChannelTransferUnsupported
 }

@@ -80,9 +80,12 @@ func registerBgStartTool(r *reg.Registry, cfg config.Config) {
 		// ends the shell before the marker is written -- and then the job
 		// looks unfinished forever.
 		marker := path + ".rc"
-		wrapper := `sh -c 'sh -c "$1"; echo $? > "$2"' _ ` + shellx.Quote(args.Command) + " " + shellx.Quote(marker)
+		qp, qm := shellx.Quote(path), shellx.Quote(marker)
+		// wrapper is a WHOLE command line (words and quotes inside), not a
+		// single argument: nohup is meant to split it. shellquote:ok
+		wrapper := `sh -c 'sh -c "$1"; echo $? > "$2"' _ ` + shellx.Quote(args.Command) + " " + qm
 		start := fmt.Sprintf("rm -f %s %s; setsid nohup %s > %s 2>&1 < /dev/null & echo started",
-			path, marker, wrapper, path)
+			qp, qm, wrapper, qp) //shellquote:ok — wrapper is a whole command line; splitting is intended
 		out, _, _, err := s.Run(start, 60*time.Second)
 		if err != nil {
 			return fail(err)
@@ -118,9 +121,15 @@ func registerBgCheckTool(r *reg.Registry, cfg config.Config) {
 		}
 		defer s.Close()
 
+		// The path is interpolated into a shell line, so it is quoted
+		// like every other interpolation (bg_start quotes args.Command;
+		// this check interpolated raw — the same discipline, one site
+		// short). The ".rc" suffix joins INSIDE one Quote (quoted once,
+		// suffix and all): the shell concatenates adjacent words anyway,
+		// and one quoted word survives a path with spaces.
 		out, _, _, err := s.Run(fmt.Sprintf(
 			"if [ -f %s.rc ]; then echo FINISHED rc=$(cat %s.rc); else echo RUNNING; fi; wc -c < %s 2>/dev/null",
-			args.Path, args.Path, args.Path), 60*time.Second)
+			shellx.Quote(args.Path+".rc"), shellx.Quote(args.Path), shellx.Quote(args.Path)), 60*time.Second)
 		if err != nil {
 			return fail(err)
 		}

@@ -100,6 +100,68 @@ struct PutDirResult {
   7: optional session.SessionStats stats,
   /** 一句话说明这次答复是什么（合并语义的提醒在这里）。 */
   8: optional string note,
+  /** 被跳过的条目数（socket / 设备文件——tar 流带不动它们）；0 = 没有跳过。 */
+  9: optional i32 skipped,
+  /** 到达完整性自证：远端 sha256sum -c 核对全部通过 = true；无法核对时是 false + note 说明（绝不假报 true）。 */
+  10: optional bool verified,
+  /** 远端核对过的文件数。 */
+  11: optional i32 verified_files,
+}
+
+/**
+ * 一次目录下载的结果（jmsx_get_dir）。
+ *
+ * 与 jmsx_put_dir 对称：远端 tar -cf - 的 stdout 走通道回来，本地边收边解。
+ * 合并语义：同名文件被覆盖，本地已有但远端没有的条目原样保留。
+ * 防御式解包：绝对路径 / 穿越目的地的条目被跳过并计数（skipped），
+ * 不会写到 local 之外。
+ */
+struct GetDirResult {
+  /** 目标资产。 */
+  1: optional string asset,
+  /** 机器上被读的目录。 */
+  2: optional string remote,
+  /** 落到本地的哪个目录。 */
+  3: optional string local,
+  /** 收了多少个文件（目录与软链计入 files，字节数只算常规文件）。 */
+  4: optional i32 files,
+  /** 解出来的常规文件字节数。 */
+  5: optional i64 bytes,
+  /** 花了多久。 */
+  6: optional double seconds,
+  /** 跳过的条目数（绝对路径 / 穿越目的地的条目等）；0 = 没有跳过。 */
+  7: optional i32 skipped,
+  /** 这个会话的账。 */
+  8: optional session.SessionStats stats,
+  /** 一句话说明这次答复是什么（跳过清单在这里）。 */
+  9: optional string note,
+}
+
+/**
+ * 一次目录级直传的结果（jmsx_relay_dir）。
+ *
+ * 源端 tar -cf - 的 stdout 直接接目标端 tar -xf - 的 stdin——归档经本进程
+ * 的管道对拷，**不落本地磁盘**。目的端合并语义与 jmsx_put_dir 一致。
+ * 直通流没有到达自证：note 里说明；需要证明的树请自己跑 sha256 核对，
+ * 或改走 GetDir + PutDir 两跳（后者带 sha256 manifest 自证）。
+ */
+struct RelayDirResult {
+  /** 源资产。 */
+  1: optional string source_asset,
+  /** 源端被读的目录。 */
+  2: optional string source_path,
+  /** 目标资产。 */
+  3: optional string dest_asset,
+  /** 目的端解包目录。 */
+  4: optional string dest_path,
+  /** 归档实际流过的字节数（传输自己的计数）。 */
+  5: optional i64 bytes,
+  /** 花了多久。 */
+  6: optional double seconds,
+  /** 这个会话的账。 */
+  7: optional session.SessionStats stats,
+  /** 合并语义提醒与「无到达自证」的说明。 */
+  8: optional string note,
 }
 
 /**

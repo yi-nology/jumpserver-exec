@@ -44,7 +44,7 @@ func TestWriteDirTarStreamsTheTreeRelative(t *testing.T) {
 		t.Errorf("bytes = %d, want %d", counts.bytes, wantBytes)
 	}
 
-	got := map[string]string{}   // regular file -> content
+	got := map[string]string{} // regular file -> content
 	var dirs, links []string
 	tr := tar.NewReader(bytes.NewReader(buf.Bytes()))
 	for {

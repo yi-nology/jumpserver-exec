@@ -317,6 +317,33 @@
         ],
         "additionalProperties": false
       },
+      "ToolInput_jmsx_get_dir": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "remote_path": {
+            "type": "string",
+            "description": "directory on the asset to download"
+          },
+          "local_path": {
+            "type": "string",
+            "description": "destination directory on this machine; created if missing"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per internal step (default 300)"
+          }
+        },
+        "required": [
+          "asset",
+          "remote_path",
+          "local_path"
+        ],
+        "additionalProperties": false
+      },
       "ToolInput_jmsx_get_file": {
         "type": "object",
         "properties": {
@@ -483,6 +510,43 @@
           "confirm": {
             "type": "boolean",
             "description": "must be true: this writes a file on the destination machine"
+          }
+        },
+        "required": [
+          "source",
+          "source_path",
+          "destination",
+          "destination_path",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "ToolInput_jmsx_relay_dir": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "source asset name or address"
+          },
+          "source_path": {
+            "type": "string",
+            "description": "directory on the source machine, e.g. /opt/app/config"
+          },
+          "destination": {
+            "type": "string",
+            "description": "destination asset name or address"
+          },
+          "destination_path": {
+            "type": "string",
+            "description": "directory to extract into on the destination machine; created if missing"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "seconds per internal step (default 300)"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true; this writes files on the destination machine, overwriting same-name ones"
           }
         },
         "required": [
@@ -1811,6 +1875,127 @@
         },
         "additionalProperties": true
       },
+      "ToolOutput_jmsx_get_dir": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "remote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "local": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "files": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "bytes": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "skipped": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
       "ToolOutput_jmsx_get_file": {
         "type": "object",
         "properties": {
@@ -2174,6 +2359,28 @@
               "null",
               "string"
             ]
+          },
+          "skipped": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "verified": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "verified_files": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "minimum": -2147483648,
+            "maximum": 2147483647
           }
         },
         "additionalProperties": true
@@ -2423,6 +2630,117 @@
           "destination_path",
           "bytes"
         ],
+        "additionalProperties": true
+      },
+      "ToolOutput_jmsx_relay_dir": {
+        "type": "object",
+        "properties": {
+          "source_asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source_path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dest_asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dest_path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "seconds": {
+            "type": [
+              "null",
+              "number"
+            ]
+          },
+          "stats": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "asset": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "commands_run": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "open_seconds": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "walk_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "approx_saved_sec": {
+                "type": [
+                  "null",
+                  "integer"
+                ],
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "command_seconds": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "reused": {
+                "type": [
+                  "null",
+                  "boolean"
+                ]
+              },
+              "backend": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
         "additionalProperties": true
       },
       "ToolOutput_jmsx_run": {
@@ -2764,6 +3082,21 @@
           }
         ]
       },
+      "ToolResult_jmsx_get_dir": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_get_dir"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
       "ToolResult_jmsx_get_file": {
         "allOf": [
           {
@@ -2863,6 +3196,21 @@
             "properties": {
               "structured": {
                 "$ref": "#/components/schemas/ToolOutput_jmsx_relay"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "ToolResult_jmsx_relay_dir": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_relay_dir"
               }
             },
             "type": "object"
@@ -3405,6 +3753,65 @@
         "summary": "调用工具 jmsx_exec_multi"
       }
     },
+    "/api/v1/tools/jmsx_get_dir/invoke": {
+      "post": {
+        "description": "[risk: read] Download a whole REMOTE directory from an asset through the bastion, as one tar stream on the recorded session's channel, extracted here as it arrives — the mirror of jmsx_put_dir. Use it to pull back a config tree, a log bundle or an output directory in one call instead of hand-rolled tar|base64 over jmsx_exec or one jmsx_get_file per file. The semantics are MERGE: same-name files are overwritten, everything the destination already had is untouched. Extraction is defensive: an archive entry that is absolute or climbs out of the destination is skipped and counted in `skipped`, never written outside. Requires the connection-token path and tar on the asset.",
+        "operationId": "invoke_jmsx_get_dir",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_get_dir"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_get_dir"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_get_dir"
+      }
+    },
     "/api/v1/tools/jmsx_get_file/invoke": {
       "post": {
         "description": "[risk: read] Read a file FROM an asset through the bastion and return its content (base64-encoded over the wire, decoded for you). Pass offset and length to read only part of it: the window is applied on the remote side, so peeking at the head of a huge log costs only the bytes you asked for. A whole file is held in memory on this machine, so for a big one ask for a window rather than the lot. On the koko terminal path the answer is additionally bounded by the pane (a few dozen rows): larger files come back with truncated=true and the full size in available_bytes, so narrow the range server-side with head/sed/tail rather than assuming you saw everything.",
@@ -3816,6 +4223,65 @@
           }
         },
         "summary": "调用工具 jmsx_relay"
+      }
+    },
+    "/api/v1/tools/jmsx_relay_dir/invoke": {
+      "post": {
+        "description": "[risk: destructive] Copy a whole directory from one managed machine DIRECTLY to another through the bastion: the source's tar stream pipes straight into the destination's extractor, and the archive never lands on this machine — the directory form of jmsx_relay. Use it to push a config tree or a deployment bundle from one host to another without pulling it here and pushing it again. The semantics on the destination are MERGE (same-name files overwritten, entries it already had untouched). A straight-through stream carries no arrival proof — run a checksum on the destination (jmsx_exec) when the tree must be proven, or move it in two hops (jmsx_get_dir then jmsx_put_dir), which verifies with a sha256 manifest. Requires the connection-token path and tar on both machines.（需确认：set confirm=true to write files on the destination machine）",
+        "operationId": "invoke_jmsx_relay_dir",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_relay_dir"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_relay_dir"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_relay_dir"
       }
     },
     "/api/v1/tools/jmsx_run/invoke": {

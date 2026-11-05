@@ -123,6 +123,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 
 它回答的是「**在那台机器上做这件事，会发生什么**」。
 
+<!-- tools:exec（机械守卫核对本块工具集合与注册表一致；见 jumpserver-kit script/check_tool_docs.py） -->
 | 工具 | 用途 |
 |---|---|
 | `jmsx_exec` | 单条命令 → stdout+stderr+退出码 |
@@ -134,13 +135,16 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | `jmsx_put_file` | 上传文件（base64 走同一条录像会话）；支持 `local_path` / `content` / `content_base64` |
 | `jmsx_put_dir` | 上传**整个目录**（tar 流走通道 stdin，合并语义：同名覆盖、不删远端已有条目）；要 `confirm=true` |
 | `jmsx_get_file` | 读文件；支持 `offset`/`length` 在**远端**取段 |
+| `jmsx_get_dir` | **整目录下载**（tar 流对称 `jmsx_put_dir`；合并语义；穿越条目跳过并计数） |
+| `jmsx_relay_dir` | **目录级机到机直传**（归档管道对拷不落本地；合并语义；无到达自证——note 说明） |
 | `jmsx_reachable` | 能不能开 shell（认证+权限+协议都要通） |
 | `jmsx_inventory` | 列堡垒机已知资产，查准确资产名 |
 | `jmsx_session_cost` | 一次会话的开销，评估该用 exec 还是 run |
 | `jmsx_audit_query` | 查本机留痕：谁试图跑什么、被门禁拦没拦 |
+<!-- /tools:exec -->
 
 ⚠️ **工具数看凭据**：`jmsx_inventory`（列资产）要 REST 凭据才注册 ——
-配了 `JUMPSERVER_TOKEN` 是 15 个，没配是 14 个（其余 14 个照常能用）。
+配了 `JUMPSERVER_TOKEN` 是 17 个，没配是 16 个（其余 16 个照常能用）。
 `jumpserver-exec tools` 列的是**当前**真正注册了的工具。
 
 ---
