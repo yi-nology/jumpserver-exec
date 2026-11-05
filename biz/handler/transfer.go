@@ -10,11 +10,11 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config) {
 	registerPutFileTool(r, cfg)
 	registerGetFileTool(r, cfg)
 	registerRelayTool(r, cfg)
+	registerPoolStatusTool(r, cfg)
+	registerCollectTool(r, cfg)
 	registerBgStartTool(r, cfg)
 	registerBgCheckTool(r, cfg)
-	registerCollectTool(r, cfg)
 	registerCollectMultiTool(r, cfg)
 	registerExecMultiTool(r, cfg)
-	registerPoolStatusTool(r, cfg)
 	registerSessionCostTool(r, cfg)
 }

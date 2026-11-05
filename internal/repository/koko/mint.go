@@ -96,18 +96,6 @@ func openOwnConnection(ctx context.Context, cfg Config, asset, account string, t
 // problem with the REQUEST (the terminal would refuse it too, ten seconds
 // later), while an API that cannot be reached is a problem with the
 // MECHANISM (the terminal does not need the API at all).
-
-// resolveAsset finds the asset the caller named.
-//
-// It goes through the cached resolver when there is one, because a fleet
-// sweep resolves one asset per host and each resolution would otherwise
-// fetch the whole estate.
-//
-// The two ways it can fail are filed differently, because the TUI fallback
-// is only worth trying for one of them: a reference that names nothing is a
-// problem with the REQUEST (the terminal would refuse it too, ten seconds
-// later), while an API that cannot be reached is a problem with the
-// MECHANISM (the terminal does not need the API at all).
 func resolveAsset(ctx context.Context, cfg Config, asset string) (jmsapi.AssetRef, error) {
 	if cfg.Assets != nil {
 		out, err := cfg.Assets.Resolve(ctx, cfg.API, []string{asset})
@@ -142,25 +130,6 @@ func resolveAsset(ctx context.Context, cfg Config, asset string) (jmsapi.AssetRe
 	}
 	return out, nil
 }
-
-// pickAccount chooses the account the session runs as.
-//
-// The token binds ONE account, so there is no walking into a list and picking
-// one interactively — the choice has to be made here, and it has to be
-// visible to the caller, which is why the answer carries the account's name.
-//
-// When the caller names one, that one wins. When it does not, the choice is:
-//
-//  1. an ACTIVE account (a disabled one cannot be logged into);
-//  2. among those, a NON-privileged one — a session that silently runs as
-//     root when the caller expected an ordinary account is the worse
-//     surprise, and the bastion's own guidance is the same: grant the
-//     account by name, not "@ALL";
-//  3. among those, the lowest username, so the same asset always gets the
-//     same account.
-//
-// The TUI path let koko pick the first account of its list, which is neither
-// stable nor stated. This is.
 
 // pickAccount chooses the account the session runs as.
 //
@@ -227,15 +196,6 @@ func pickAccount(ctx context.Context, cfg Config, assetID, want string) (jmsapi.
 // and the terminal path does not need the API at all — so it is worth the
 // walk. An asset that is not there is a problem with the REQUEST, and the
 // terminal would answer exactly the same way, ten seconds later.
-
-// assetAccounts reads the accounts of an asset, through the cached resolver
-// when there is one.
-//
-// The failure is classified before it leaves, because the class decides what
-// happens next: an API that cannot answer is a problem with the MECHANISM,
-// and the terminal path does not need the API at all — so it is worth the
-// walk. An asset that is not there is a problem with the REQUEST, and the
-// terminal would answer exactly the same way, ten seconds later.
 func assetAccounts(ctx context.Context, cfg Config, assetID string) ([]jmsapi.AccountRef, error) {
 	var (
 		accts []jmsapi.AccountRef
@@ -262,17 +222,6 @@ func assetAccounts(ctx context.Context, cfg Config, assetID string) ([]jmsapi.Ac
 // ⚠️ This is why the account cache does NOT serve a stale list (see
 // jmsapi.NewAssetResolver): the list decides who the session runs as, and a
 // stale one can name an account that has since been demoted.
-
-// classifyAccountRead says whether a failure to read an asset's accounts is
-// worth falling back to the terminal for.
-//
-// 4xx is the REQUEST — the asset is not there, or the caller may not see it
-// — and the terminal refuses it the same way. 5xx and transport failures are
-// the MECHANISM, and the terminal does not go through the API at all.
-//
-// ⚠️ This is why the account cache does NOT serve a stale list (see
-// jmsapi.NewAssetResolver): the list decides who the session runs as, and a
-// stale one can name an account that has since been demoted.
 func classifyAccountRead(err error) error {
 	if err == nil {
 		return nil
@@ -283,27 +232,6 @@ func classifyAccountRead(err error) error {
 	}
 	return fmt.Errorf("%w: %w", ErrTokenUnavailable, err)
 }
-
-// mintConnectionToken asks the bastion for a one-shot credential.
-//
-// The delegation path is tried first: a token minted that way carries the
-// DELEGATED user's authority, which is the same authority the sessions have
-// always had. The ordinary path — the API token's own — is wider, and the
-// doctor reports which one is in force so the difference is never invisible.
-//
-// ⚠️ The version decides whether the delegation path is TAKEN at all.
-//
-// JumpServer v4 has no Chat AI delegation scheme (no chat_ai application, no
-// X-JMS-AI-Delegation authentication class, no chat-ai API prefix), and a
-// delegation credential is sent WITHOUT the API token — so on v4 the request
-// comes back 401. A 401 here is classified as "the connection-token scheme is
-// unavailable", and that would send every session down the slow koko-terminal
-// path, for a reason that does not exist: the token path works fine on v4.
-//
-// So on v4 the delegation branch is simply not entered, and the token is
-// minted with the API credential. That is WIDER than a delegated session, and
-// it is not hidden: the doctor's identity row says which version the
-// deployment runs and what the sessions consequently run as.
 
 // mintConnectionToken asks the bastion for a one-shot credential.
 //
@@ -389,8 +317,6 @@ func mintConnectionToken(ctx context.Context, cfg Config, assetID, accountID str
 }
 
 // parseConnectionToken reads the token out of a response body.
-
-// parseConnectionToken reads the token out of a response body.
 func parseConnectionToken(raw []byte) (connectionToken, error) {
 	var m map[string]any
 	if err := json.Unmarshal(raw, &m); err != nil {
@@ -407,13 +333,6 @@ func parseConnectionToken(raw []byte) (connectionToken, error) {
 	}
 	return connectionTokenFromMap(m)
 }
-
-// connectionTokenFromMap reads the token out of a decoded response.
-//
-// The shape is {id, value, user: {...}, asset: {...}, account: "<uuid>",
-// is_reusable, expire_time}. Both `id` and `value` have to be there: a token
-// with one of them missing cannot be used, and a half-token that looks usable
-// is worse than an error.
 
 // connectionTokenFromMap reads the token out of a decoded response.
 //
@@ -448,18 +367,6 @@ func connectionTokenFromMap(m map[string]any) (connectionToken, error) {
 // Everything else — the endpoint not being there, the deployment not
 // offering tokens, the credential not being allowed to use them — is about
 // the SCHEME, and that is exactly what the terminal is there for.
-
-// classifyTokenRefusal decides whether a refused connection-token request is
-// about the asset or about the scheme.
-//
-// The bastion answers a refusal with a code, and the codes that start with
-// "perm_" are about the caller's rights to that asset — no account on it, no
-// permission covering it. Those would fail identically through the koko
-// terminal, so the fallback would buy a ten-second walk to learn nothing.
-//
-// Everything else — the endpoint not being there, the deployment not
-// offering tokens, the credential not being allowed to use them — is about
-// the SCHEME, and that is exactly what the terminal is there for.
 func classifyTokenRefusal(status int, body []byte) error {
 	code := tokenErrorCode(body)
 	detail := strings.TrimSpace(jmsapi.Truncate(string(body), 300))
@@ -469,9 +376,6 @@ func classifyTokenRefusal(status int, body []byte) error {
 	return fmt.Errorf("%w: the bastion refused the connection token: %s: %s",
 		ErrTokenUnavailable, where(status, code), detail)
 }
-
-// where renders the status and code of a refusal, and copes with a refusal
-// that carried no status (a body that is an error rather than a token).
 
 // where renders the status and code of a refusal, and copes with a refusal
 // that carried no status (a body that is an error rather than a token).
@@ -490,9 +394,6 @@ func where(status int, code string) string {
 
 // classifyTokenError is classifyTokenRefusal for the ordinary token path,
 // whose failure arrives as a typed API error.
-
-// classifyTokenError is classifyTokenRefusal for the ordinary token path,
-// whose failure arrives as a typed API error.
 func classifyTokenError(err error) error {
 	var apiErr *errs.APIError
 	if errors.As(err, &apiErr) {
@@ -502,12 +403,6 @@ func classifyTokenError(err error) error {
 	// the terminal may still work — it does not need the API.
 	return fmt.Errorf("%w: %w", ErrTokenUnavailable, err)
 }
-
-// tokenErrorCode reads the code out of a refusal body.
-//
-// The bastion answers a refusal as {"detail": "...", "code": "..."}. A body
-// that does not have one is not an error: the code is what tells a
-// permission problem from a broken endpoint.
 
 // tokenErrorCode reads the code out of a refusal body.
 //
@@ -528,13 +423,6 @@ func tokenErrorCode(body []byte) string {
 // "ssh: unable to authenticate, attempted methods ...". It is worth telling
 // apart from a network failure, because only this one means the terminal
 // fallback could work.
-
-// isAuthRefusal says whether koko refused the token as a credential.
-//
-// x/crypto/ssh has no typed error for it, so the message is all there is:
-// "ssh: unable to authenticate, attempted methods ...". It is worth telling
-// apart from a network failure, because only this one means the terminal
-// fallback could work.
 func isAuthRefusal(err error) bool {
 	return err != nil && stringx.ContainsAny(err.Error(), "unable to authenticate")
 }
@@ -544,28 +432,9 @@ func isAuthRefusal(err error) bool {
 // koko accepts the token as an SSH credential: the username is the token's
 // id with a JMS- prefix, and the password is the token's value. Logging in
 // that way lands straight on the asset.
-
-// tokenUsername is the SSH username a connection token is used with.
-//
-// koko accepts the token as an SSH credential: the username is the token's
-// id with a JMS- prefix, and the password is the token's value. Logging in
-// that way lands straight on the asset.
 func tokenUsername(id string) string {
 	return "JMS-" + id
 }
-
-// dialKoko logs into koko with the token.
-//
-// The host key is accepted unauthenticated, which deserves an honest note:
-// koko presents a host key this tool has no way to pin — there is no
-// known_hosts contract for a bastion reached with a one-shot token, and the
-// token itself is what authenticates the session. The trade-off is that an
-// on-path attacker could impersonate koko and read or alter the session;
-// what they cannot do is reuse it, because the token is single-use and
-// MFA-bounded. The TUI path takes the same host key on the same host.
-//
-// see sshx.Dial, where the reason the handshake needs its own bound is
-// spelled out (it lives in oekit/network/sshx now).
 
 // dialKoko logs into koko with the token.
 //

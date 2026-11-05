@@ -150,22 +150,6 @@ func stripScaffolding(s, command string) string {
 // row is there with its number and no text yet. The row COUNT does not
 // change while that happens, so a count-only signature reported "settled"
 // and the parse handed back an empty line.
-
-// resultSignature summarises how complete a capture looks: how many numbered
-// rows it holds, plus whether the exit-code marker has arrived.
-//
-// Both halves are needed. Rows alone are not enough — a command whose only
-// output IS the exit code (`false`, `sh -c 'exit 42'`) yields zero rows and
-// would then never satisfy a "rows > 0" wait and hang until the deadline. That
-// is exactly the regression that dropped exit-code passthrough.
-// resultSignature is the "has the paint settled" signal: how many numbered
-// rows there are, the exit code, and a fingerprint of their text.
-//
-// The text is the part that was missing. tmux paints a row's number and its
-// text in the same repaint, but a wide payload can be caught mid-paint: the
-// row is there with its number and no text yet. The row COUNT does not
-// change while that happens, so a count-only signature reported "settled"
-// and the parse handed back an empty line.
 func resultSignature(s string, m marks, minEpoch int) (rows int, code int, fingerprint uint64) {
 	r, c, _ := scanNumbered(s, m, minEpoch)
 	h := fnv.New64a()
@@ -175,24 +159,6 @@ func resultSignature(s string, m marks, minEpoch int) (rows int, code int, finge
 	}
 	return len(r), c, h.Sum64()
 }
-
-// parseOutput reconstructs the command result from the captured screen.
-//
-// It deliberately does NOT assume the payload sits in one contiguous span
-// between the markers. koko's tmux repaints the whole pane on every update, so
-// the capture is hundreds of KB of interleaved frames: the begin marker, its own
-// row, the result and the end marker routinely land in different repaints, with
-// empty border rows in between. A 60-line result measured 967 KB and the very
-// first 700 bytes after the begin marker were pure frame decoration.
-//
-// Instead every painted row is scanned, the ones carrying a `cat -n` number are
-// collected, and the numbering reassembles them: line N appears once per repaint
-// that included it, so the first occurrence wins and the rest are repaint noise.
-// Output that genuinely repeats still gets distinct numbers, so nothing
-// legitimate is dropped.
-//
-// scanNumbered below is the scanner that does that work and also recovers the
-// command's exit code; parseOutput joins its lines.
 
 // parseOutput reconstructs the command result from the captured screen.
 //
@@ -351,10 +317,6 @@ func scanNumbered(s string, m marks, minEpoch int) ([]string, int, bool) {
 // parseOutput joins scanNumbered's rows into the command's output text.
 // The why — repaint noise, numbered rows, gap detection — is told once, on
 // scanNumbered, which is where that work happens.
-
-// parseOutput joins scanNumbered's rows into the command's output text.
-// The why — repaint noise, numbered rows, gap detection — is told once, on
-// scanNumbered, which is where that work happens.
 func parseOutput(s string, m marks, minEpoch int) (string, int, bool, error) {
 	if !strings.Contains(s, m.end) {
 		return "", -1, false, fmt.Errorf("no end marker in output")
@@ -374,30 +336,13 @@ func parseOutput(s string, m marks, minEpoch int) (string, int, bool, error) {
 //
 // So a row is not a line of output; it is a set of columns, and the `cat -n`
 // numbering injected by Exec is what puts them back in order.
-
-// frameSplit breaks a painted row into its columns. koko renders the asset's
-// terminal inside a tmux pane, and tmux happily puts several short lines on one
-// physical row, separated by frame bars:
-//
-//	││   1	hostname││   2	Linux││
-//
-// So a row is not a line of output; it is a set of columns, and the `cat -n`
-// numbering injected by Exec is what puts them back in order.
 var frameSplit = regexp.MustCompile(`[│┃║]+`)
-
-// rowCandidate is a place in a column where a numbered row may start.
 
 // rowCandidate is a place in a column where a numbered row may start.
 type rowCandidate struct {
 	// start is where the row's prefix begins.
 	start int
 }
-
-// cursorMoveIndex returns the index of the next cursor-positioning escape
-// sequence in s, or -1.
-//
-// It marks the end of a row: tmux moves the cursor to the next pane row
-// and writes there, so everything past it belongs to another row.
 
 // cursorMoveIndex returns the index of the next cursor-positioning escape
 // sequence in s, or -1.
@@ -413,21 +358,6 @@ func cursorMoveIndex(s string) int {
 	}
 	return loc[0]
 }
-
-// rowIsOurs says whether a numbered row belongs to this command.
-//
-// Every row this tool writes carries the epoch of the command that wrote
-// it, so a row WITHOUT an epoch is not one of ours: it can only be a piece
-// of the output that happens to look like a row (a colour-highlighted
-// "2024@foo", say), and letting it in would replace the real row with a
-// fragment of the output — silently.
-//
-// A row with an OLDER epoch belongs to an earlier command: it is scrollback
-// on the pane, not this answer.
-//
-// The plain form is still accepted when the caller does not know the epoch
-// (minEpoch == 0), which is the case in the tests that pin the shape of a
-// row.
 
 // rowIsOurs says whether a numbered row belongs to this command.
 //
@@ -478,34 +408,6 @@ func rowIsOurs(mt []string, minEpoch int) bool {
 // is a segment of its own, and taking the last match would let it take the
 // row's place — the answer would carry the highlighted fragment instead of
 // the command's output, silently.
-
-// numberedCandidates returns every place in the column where a numbered row
-// could start.
-//
-// Why it exists. The screen buffer is the RAW STREAM, not a rendered
-// screen: tmux moves the cursor with an escape sequence and writes the row
-// where it lands, so a row can end up on the same stream line as the status
-// bar that was repainted just before it:
-//
-//	^[[50;1H^[[2Kctrl+b:…ssh://opsuser@node-071^[[14;1H…^[[?25h1000-2@node
-//
-// The numbered row is at the END of that line, and the row matcher wants a
-// column that STARTS with the number — so the row was dropped, the answer
-// came back with an exit code and no output at all, and the pane looked
-// healthy.
-//
-// Measured on 2026-10-28: one answer in sixteen was empty, on a fresh
-// session (where the pane still repaints the status bar around the first
-// command).
-//
-// The rule: a numbered row starts at a SEGMENT BOUNDARY — right after an
-// escape sequence — and the FIRST such boundary that carries a row wins.
-//
-// The FIRST, not the last: the output itself can contain something that
-// looks like a row. A colour-highlighted match (grep --color on "2024@foo")
-// is a segment of its own, and taking the last match would let it take the
-// row's place — the answer would carry the highlighted fragment instead of
-// the command's output, silently.
 func numberedCandidates(col string) []rowCandidate {
 	var out []rowCandidate
 	for i := 0; i < len(col); {
@@ -517,21 +419,6 @@ func numberedCandidates(col string) []rowCandidate {
 	}
 	return out
 }
-
-// segmentEnd returns the index just past the segment that starts at i.
-//
-// A segment ends where the next escape sequence begins (or at the end of
-// the string), and the escape sequence is consumed WHOLE — including the
-// shapes that are not CSI:
-//
-//   - ESC [ … final    a CSI (cursor moves, colours, the cursor style)
-//   - ESC ] … BEL|ST   an OSC (the window title!) — left unconsumed, its
-//     text would start the next segment, and the row after it would not
-//     look like a row
-//   - ESC ( B etc.     a charset selection — two bytes
-//   - ESC M, ESC 7 …   a single-byte escape — two bytes. The second byte
-//     has to be consumed as well: a digit there would otherwise start the
-//     next segment looking like a row.
 
 // segmentEnd returns the index just past the segment that starts at i.
 //
@@ -608,19 +495,7 @@ func segmentEnd(s string, i int) int {
 // The separator is the literal '@' because that is what Exec converts the tab
 // into; matching whitespace here would fail against a real screen, where tmux
 // has already collapsed the tab away.
-
-// numberedLine matches one "cat -n" line: leading spaces, the number, a tab,
-// then the text.
-// numberedLine matches one line of the `cat -n | tr '\t' '@'` pipeline:
-// leading spaces, the line number, the '@' separator, then the text.
-//
-// The separator is the literal '@' because that is what Exec converts the tab
-// into; matching whitespace here would fail against a real screen, where tmux
-// has already collapsed the tab away.
 var numberedLine = regexp.MustCompile(`^\s*(\d+)(?:-(\d+))?@(.*)$`)
-
-// cleanFrame removes the frame decoration from a painted row and returns its
-// columns, each already trimmed.
 
 // cleanFrame removes the frame decoration from a painted row and returns its
 // columns, each already trimmed.
@@ -667,12 +542,6 @@ func stripANSI(s string) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	return s
 }
-
-// tail is the LAST n characters of a string.
-//
-// It is not stringx.FirstN, which keeps the first n: an error message about
-// a screen wants the END of the screen. The slice is by rune, so a
-// multi-byte character is never cut in half.
 
 // tail is the LAST n characters of a string.
 //
