@@ -95,6 +95,31 @@ jobs:
         # ⚠️ 需要仓库侧配好 codecov 才能上传成功;没配时**不要**让这一条把整个 CI 拉红。
         continue-on-error: true
 
+  # ---- 守卫的牙齿：swagger 字节守卫的变异验证 ------------------------------
+  # 与 kit 仓的 mutations job 同一条纪律：变异只在「有人记得跑」时才有意义，
+  # 接进 CI 成为每次 push 的事实。本仓只有这一个变异脚本（其余住在 kit）。
+  mutations:
+    name: Guard mutations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run mutation sweep
+        run: python3 script/mutate-swagger-guard.py
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
