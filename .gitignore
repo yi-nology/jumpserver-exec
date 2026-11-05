@@ -26,3 +26,8 @@ go.work.sum
 .DS_Store
 __pycache__/
 *.pyc
+
+# ZCode 会话工具的工作目录（agent 运行时自己生成）
+.video_agent/
+.v2c/
+
