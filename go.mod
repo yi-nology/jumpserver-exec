@@ -17,7 +17,7 @@ require (
 	github.com/oekit/logx v0.8.2
 	github.com/oekit/network v0.6.1
 	github.com/oekit/pkg v0.33.0
-	github.com/yi-nology/jumpserver-kit v0.8.1
+	github.com/yi-nology/jumpserver-kit v0.9.1
 	golang.org/x/crypto v0.58.0
 )
 
