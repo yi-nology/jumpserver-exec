@@ -20,7 +20,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# 本仓的 IDL 与它的落点：idl/<包名>/ 的入口 thrift → model/<包名>/
+# 本仓的 IDL 与它的落点：idl/（单词汇仓摊平布局）的入口 thrift → model/<包名>/
+# 与 idl/<包名>/（多词汇仓）都认：入口名取自文件一致声明的 `namespace go`，
+# 不取目录名 —— 平铺的 idl/ 目录名是 "idl"，不命名任何包。
 #
 # -r 不是可选项：一份 IDL 按域拆成同目录多份 thrift（入口 <包名>.thrift
 # include 各域文件），没有 -r 时 thriftgo 只生成入口那份 —— 各域声明的类型
@@ -37,14 +39,24 @@ generate() {
   thriftgo --gen go:template=slim -r -o "$out" "$idl"
 }
 
+# entryOf 找一个 IDL 目录的入口 thrift：该目录第一份 `namespace go` 声明的
+# 包名 + .thrift。嵌套 idl/<pkg>/ 下它就是 <pkg>.thrift（旧行为）；平铺
+# idl/ 下目录名不命名包，只能问文件。
+entryOf() {
+  local dir="$1"
+  local ns
+  ns="$(grep -h '^namespace go ' "$dir"/*.thrift | head -1 | awk '{print $3}')"
+  [[ -n "$ns" ]] || { echo "⚠️  $dir 里没有 namespace go 声明" >&2; return 1; }
+  echo "$dir/$ns.thrift"
+}
+
 if [[ $# -gt 0 ]]; then
   for dir in "$@"; do
     [[ "$dir" = /* ]] || dir="$ROOT/$dir"
-    base="$(basename "$dir")"
-    generate "$dir/$base.thrift" "$ROOT/biz/model"
+    generate "$(entryOf "$dir")" "$ROOT/biz/model"
   done
 else
-  generate "$ROOT/idl/jmsexec/jmsexec.thrift" "$ROOT/biz/model"
+  generate "$(entryOf "$ROOT/idl")" "$ROOT/biz/model"
 fi
 
 echo "==> 完成；记得把重新生成的模型一起提交"

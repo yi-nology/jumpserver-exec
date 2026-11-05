@@ -230,11 +230,11 @@ biz/                         ← this plane (handler / model / router)
 internal/config/             ← koko wiring and the REST endpoint
 internal/repository/koko/    ← the koko TUI protocol and the file transfer
 internal/service/policy/     ← the risk side of the tool catalogue
-idl/jmsexec/                 ← the contract (thrift): command results / session
+idl/                         ← the contract (thrift): command results / session
                               #   statistics / sweep estimates / transfer results
 ```
 
-The contract vocabulary is this plane's own — `idl/jmsexec/` (the entry
+The contract vocabulary is this plane's own — `idl/` (flat layout: the entry
 `jmsexec.thrift` includes the per-domain files) generates
 `biz/model/jmsexec/` — and this plane's own code depends on
 it. The shared base (`pkg/`) depends on neither plane: a base that reaches

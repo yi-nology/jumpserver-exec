@@ -47,7 +47,7 @@ internal/
 ├── arch/                   # 机械守卫（判据；守卫体在 kit 的 pkg/arch）
 ├── middleware/             # （空）HTTP 中间件：HTTP 面的认证与路由在底座 pkg/httpapi
 └── rpchandler/             # （空）RPC 服务端：这一面不对外提供 RPC
-idl/jmsexec/                # 契约的 thrift 定义：入口 jmsexec.thrift + 按域拆的多份
+idl/                        # 契约的 thrift 定义（摊平布局）：入口 jmsexec.thrift + 按域拆的多份
 pkg/                        # （空）通用库在 kit 仓，不在这里放东西
 swagger/                    # HTTP 面的 OpenAPI（生成物：tools openapi，守卫逐字节比对）
 etc/ deploy/ monitoring/ rpcx/ kitex_gen/
@@ -74,8 +74,9 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：HTTP 面的路�
 **分层的方向是硬的，有守卫盯着**（判据在本仓 `internal/arch/`，守卫体在 kit 的 `pkg/arch`）：
 - **本仓不得 import 管理面**（另一个服务）；**底座不得依赖任何服务**。
 - **`cmd/` 是最外层，谁都不许 import**。
-- **IDL 目录名 == 生成包名 == 模型目录名**：`idl/jmsexec/` 生成的包必须叫 `jmsexec`，
-  放在叫 `jmsexec` 的目录里。
+- **IDL 目录 ↔ 生成包名 ↔ 模型目录名一一对应**：本仓单词汇摊平在 `idl/`，
+  包名由全目录一致的 `namespace go jmsexec` 命名，生成的包必须叫 `jmsexec`、
+  放在叫 `jmsexec` 的目录里（守卫 pkg/arch 认平铺与嵌套两种布局）。
 
 ---
 
@@ -288,7 +289,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ### 2.10 输出形状全部是契约类型
 
-- ⚠️ **执行面 15 个工具的输出形状全部是契约类型**（`idl/jmsexec/`），
+- ⚠️ **执行面 15 个工具的输出形状全部是契约类型**（`idl/`），
   `render.Object` 一个不剩（`biz/handler/contract_test.go` 盯着）。
   契约类型由工具**直接产出**，不是现拼的 map —— 所以键名写错编译期就红。
 - 契约词汇：`SessionStats`（会话的账：握手多久、省了多少）、

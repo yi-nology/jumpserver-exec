@@ -123,7 +123,7 @@ MODULES=(
   "github.com/tidwall/pretty@v1.2.0"
   "github.com/tjfoc/gmsm@v1.4.1"
   "github.com/twitchyliquid64/golang-asm@v0.15.1"
-  "github.com/yi-nology/jumpserver-kit@v0.7.0"
+  "github.com/yi-nology/jumpserver-kit@v0.8.0"
   "github.com/yosida95/uritemplate/v3@v3.0.2"
   "go.opentelemetry.io/otel/log@v1.47.0"
   "go.uber.org/multierr@v1.11.0"

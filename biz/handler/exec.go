@@ -82,7 +82,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 			// byte for byte what it was.
 			return fail(err)
 		}
-		// The shape of the answer is the contract (idl/jmsexec/jmsexec.thrift),
+		// The shape of the answer is the contract (idl/jmsexec.thrift),
 		// not a map assembled here: the tool produces the contract, so the
 		// wire format has one owner.
 		res := &jmsexec.CommandResult{

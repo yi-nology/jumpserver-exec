@@ -33,7 +33,7 @@
 //	internal/config/               ← 配置（环境变量）
 //	internal/repository/koko/      ← 数据访问层（koko TUI 协议与文件传输）
 //	internal/service/policy/        ← 工具目录的风险侧
-//	idl/jmsexec/                   ← 契约，thrift
+//	idl/                           ← 契约，thrift（摊平布局）
 //
 // 共用底座（协议层、门禁、结果整形、留痕、脱敏、失败分类）在**另一个仓**：
 // github.com/yi-nology/jumpserver-kit。
@@ -44,7 +44,7 @@ package main
 //
 // ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.5.0` 装出来的二进制
 // 要自己说对版本；说错的话，用户看 `--version` 会以为装错了版本。
-const Version = "0.10.0"
+const Version = "0.11.0"
 
 func main() {
 	dispatch()
