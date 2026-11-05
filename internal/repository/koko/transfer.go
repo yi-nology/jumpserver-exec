@@ -20,6 +20,7 @@ package koko
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -223,7 +224,11 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 			if manifestName == "" {
 				verifyNote = "the manifest did not extract; arrival could not be verified"
 			} else {
-				checkCmd := "cd " + shellx.Quote(remoteDir) + " && sha256sum -c " + shellx.Quote(manifestName) + " --quiet; status=$?; rm -f " + shellx.Quote(remoteDir+"/"+manifestName) + "; exit $status"
+				// manifestName is ALREADY the full path (ls -1t <dir>/.jmsx-
+				// manifest-* echoes the path it was handed) — joining
+				// remoteDir again made rm a no-op path and left a manifest
+				// in every uploaded tree (measured 2026-11-06 live).
+				checkCmd := "cd " + shellx.Quote(remoteDir) + " && sha256sum -c " + shellx.Quote(manifestName) + " --quiet; status=$?; rm -f " + shellx.Quote(manifestName) + "; exit $status"
 				if _, err := runLocked(checkCmd, timeout); err != nil {
 					return nil, fmt.Errorf("arrival verification FAILED (some files do not match the manifest): %w", err)
 				}
@@ -338,24 +343,24 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 	}
 
 	start := time.Now()
-	pr, pw := io.Pipe()
-	counts := &dirTarCounts{}
-	// The extractor runs beside the stream, not inside it (GoSafe: a panic
-	// becomes a logged stack, not a dead server). The pipe closes no matter
-	// what — on an extract error the reader stops, the remote tar dies on
-	// the broken pipe, and THAT is the error the caller sees.
-	async.GoSafeLabeled("koko-dir-untar", func() {
-		defer pw.Close()
-		if err := readDirTar(pr, localDir, counts); err != nil {
-			logx.Error("koko dir extract failed", "dir", localDir, "err", err)
-		}
-	})
-	code, err := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" .", pw, timeout)
+	// The archive is buffered whole, then extracted synchronously. The
+	// streamed-pipe variant raced: the extractor owned the writer's close,
+	// an early extract error surfaced as a confusing "closed pipe" from
+	// the writer, and the counts could be read before the extractor
+	// finished (measured 2026-11-06: files on disk, answer an error).
+	// Memory is bounded by the transfer, like jmsx_get_file's whole-file
+	// read — for a tree beyond RAM, fetch it piece by piece.
+	var buf bytes.Buffer
+	code, err := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", &buf, timeout)
 	if err != nil {
 		return nil, err
 	}
 	if code != 0 {
 		return nil, fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	}
+	counts := &dirTarCounts{}
+	if err := readDirTar(&buf, localDir, counts); err != nil {
+		return nil, err
 	}
 	note := ""
 	if counts.skipped > 0 {
