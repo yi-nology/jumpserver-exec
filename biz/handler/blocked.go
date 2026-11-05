@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
-	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
 )
 
 // blockedCommand is the answer of a command that was NOT executed.
@@ -20,13 +20,13 @@ import (
 // function that also spells the policy is how the two planes used to answer
 // the same question ("would this run?") with different words.
 func blockedCommand(asset, command, riskClass, blocked string) *jmsexec.CommandResult {
-	return &jmsexec.CommandResult{
+	res := &jmsexec.CommandResult{
 		Asset:   asset,
 		Command: command,
 		// -1 means "no exit code" — there was no command to have one.
 		ExitCode: -1,
 		Via:      "jumpserver koko (bastion), recorded",
-		Risk:     jms.Opt(riskClass),
-		Blocked:  jms.Opt(blocked),
 	}
+	render.FillRefusal(res, riskClass, blocked)
+	return res
 }

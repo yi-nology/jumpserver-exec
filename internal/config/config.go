@@ -17,10 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oekit/core/config"
-
 	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
 	"github.com/yi-nology/jumpserver-kit/pkg/audit"
+	"github.com/yi-nology/jumpserver-kit/pkg/confload"
 	"github.com/yi-nology/jumpserver-kit/pkg/fspath"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 )
@@ -221,14 +220,8 @@ type settings struct {
 // number) is worse than not running.
 func Load() (Config, error) {
 	s := &settings{}
-	if err := config.ApplyEnv(s); err != nil {
-		return Config{}, fmt.Errorf("read configuration: %w", err)
-	}
-	if err := config.FillDefaults(s); err != nil {
-		return Config{}, fmt.Errorf("apply configuration defaults: %w", err)
-	}
-	if err := config.ValidateTags(s); err != nil {
-		return Config{}, fmt.Errorf("validate configuration: %w", err)
+	if err := confload.FromEnv(s); err != nil {
+		return Config{}, err
 	}
 
 	cfg := Config{
@@ -252,26 +245,22 @@ func Load() (Config, error) {
 	}
 	// ⚠️ No "auth off": the HTTP surface answers tool calls on the
 	// operator's machines, so it needs a bearer token.
-	if cfg.HTTPAddr != "" && cfg.HTTPToken == "" {
-		return Config{}, fmt.Errorf("JMS_HTTP_ADDR is set but JMS_HTTP_TOKEN is not: the HTTP surface answers " +
-			"tool calls, so it needs a bearer token. Generate one (openssl rand -hex 32) and set " +
-			"JMS_HTTP_TOKEN, or unset JMS_HTTP_ADDR to stay on stdio only")
+	if err := confload.HTTPFaceNeedsToken(cfg.HTTPAddr, cfg.HTTPToken); err != nil {
+		return Config{}, err
 	}
 	// ⚠️ The password is read from a file when it is not in the
 	// environment, and it is read ONLY when there is no PrivateToken: the
 	// token wins, because it does not expire and a long-running process
-	// should not have to keep a login alive.
-	if cfg.API.Token == "" && cfg.API.Username != "" {
-		pw, err := jmsapi.LoadPassword()
-		if err != nil {
-			return Config{}, fmt.Errorf("JUMPSERVER_USERNAME is set but the password is missing: %w", err)
-		}
+	// should not have to keep a login alive. The OTP secret is optional.
+	pw, otp, err := confload.LoginSecrets(cfg.API.Token, cfg.API.Username, cfg.API.OTP)
+	if err != nil {
+		return Config{}, err
+	}
+	if pw != "" {
 		cfg.API.Password = pw
 	}
-	if cfg.API.OTP == "" {
-		if otp, err := jmsapi.LoadOTPSecret(); err == nil {
-			cfg.API.OTP = otp
-		}
+	if otp != "" {
+		cfg.API.OTP = otp
 	}
 	cfg.Koko = koko.Config{
 		Host:    strings.TrimSpace(s.BastionHost),
@@ -313,9 +302,8 @@ func Load() (Config, error) {
 	cfg.Koko.Memory = koko.NewBackendMemory(s.BackendMemoryTTL)
 	cfg.Koko.Pool = koko.NewPool(cfg.Koko, s.PoolTTL)
 
-	if cfg.RPCAddr != "" && cfg.RPCToken == "" {
-		return Config{}, fmt.Errorf("JMS_RPC_ADDR is set but JMS_RPC_TOKEN is not: the RPC face answers " +
-			"tool calls to whoever can reach the port, and there is no auth-off mode")
+	if err := confload.RPCFaceNeedsToken(cfg.RPCAddr, cfg.RPCToken); err != nil {
+		return Config{}, err
 	}
 	return cfg, nil
 }

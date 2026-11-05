@@ -11,6 +11,31 @@
 
 ### 修复
 
+## [0.9.0] - 2026-11-05
+
+### 修复
+
+- **连接池 TTL 报告失真**：`jmsx_pool_status` 与 `--doctor` 此前报编译期常量 2m，
+  实际生效值来自 `JMS_POOL_TTL`（新增 `Pool.TTL()`）；操作员改配置后不再读到旧数字。
+- **无连接池部署丢失 TUI 回退**：`openOwnConnection` 对 koko 拒签令牌登录的错误
+  现在与 `dialPooled` 一样包上 `ErrTokenUnavailable`——同一拒绝，有无连接池行为一致。
+- `jmsx_pool_status` 恒假的 `Backend == nil` 判断移除；TUI 握手失败文案
+  "after 5 confirms" 更正为 6。
+
+### 变更
+
+- **判定词汇收编为单一写法**：六个工具的演练/被拒答复改用底座的
+  `render.FillRehearsal`/`FillRefusal`（见 kit v0.6.0），字段拼法不再各写各份。
+- **worker 池统一为 `runSweep`**：`jmsx_exec_multi` 内联的 jobs/GoSafe/WaitGroup 池与
+  `runAcrossAssets` 合并为一个带显式选项（stop_on_error / feed 预算 / 空资产跳过）的
+  `runSweep`；顺带移除只写不读的 `firstErr` 死标志。
+- **配置装载走底座 `confload`**：三段式读档、HTTP/RPC 拒绝文案、密码/OTP 回退收编。
+- **audit limit 复述走底座 `audit.EffectiveLimit`**，本地副本删除。
+- **大文件拆分（行为不变）**：koko.go（1467→883 行）拆出 screen.go（屏幕解析纯函数）；
+  token.go（1284→839）拆出 mint.go（铸 token 与错误分类）；biz/handler/transfer.go
+  （1100 行）按域拆为 run/file/bg/collect/sweep/pool 六个文件 + 调度器。
+- 死代码清理约 120 行（不可达分支、零调用函数与字段、纯转发包装）。
+
 ## [0.8.0] - 2026-11-05
 
 ### 新增

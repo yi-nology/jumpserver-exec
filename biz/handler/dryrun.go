@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 	"github.com/yi-nology/jumpserver-kit/model/jms"
+	"github.com/yi-nology/jumpserver-kit/pkg/render"
 	"github.com/yi-nology/jumpserver-kit/pkg/risk"
 )
 
@@ -28,9 +29,6 @@ func rehearsal(class jms.CommandClass, confirm bool) (riskClass string, would bo
 	return class.String(), would, blocked
 }
 
-// dryRunNote says what a rehearsal answer is, in one sentence.
-const dryRunNote = "dry run: nothing was executed"
-
 // dryRunCommand is the dry-run answer of a single command.
 func dryRunCommand(asset, command string, class jms.CommandClass, confirm bool) *jmsexec.CommandResult {
 	// It would run if it needs no confirmation — or if the confirmation is
@@ -41,14 +39,10 @@ func dryRunCommand(asset, command string, class jms.CommandClass, confirm bool) 
 		Command:  command,
 		ExitCode: -1,
 		Via:      "jumpserver koko (bastion), recorded",
-		Risk:     jms.Opt(riskClass),
-		DryRun:   jms.OptBool(true),
-		// Nothing ran, so there is no exit code to report.
-		WouldExecute: jms.OptBool(would),
-		Note:         jms.Opt(dryRunNote),
 	}
-	if blocked != "" {
-		res.Blocked = jms.Opt(blocked)
-	}
+	// The verdict vocabulary (risk / dry_run / would_execute / blocked /
+	// note) is filled by the shared writer, so the two planes cannot
+	// drift in what a rehearsal says.
+	render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 	return res
 }

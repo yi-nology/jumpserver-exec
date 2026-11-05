@@ -148,7 +148,7 @@ func RegisterAuditTools(r *reg.Registry, settings audit.Settings) {
 				"%s本机门禁留痕，最新的在前（返回 %d 行，匹配且读到 %d 行，本次最多 %d 行%s%s）；"+
 					"这是「在这里尝试过什么」，不是堡垒机上的「在资产上跑过什么」。",
 				trailOffNote(dir),
-				len(rows), res.Total, effectiveLimit(args.Limit), skippedNote(res.Skipped),
+				len(rows), res.Total, audit.EffectiveLimit(args.Limit), skippedNote(res.Skipped),
 				retentionNote(settings.RetentionDays))),
 		})
 	})
@@ -193,22 +193,10 @@ func retentionNote(days int) string {
 		"但「旧」的判断在部分平台上不精确 ⇒ 更早的行可能还在）", days)
 }
 
-// effectiveLimit is the limit that was in force for this call.
-//
-// ⚠️ NOT the ceiling: the ceiling (audit.MaxReadLimit) is what the trail
-// allows, and the limit in force is what this call asked for (or the
-// default). Saying "at most 500" when the call asked for 50 is a true
-// sentence about the wrong thing.
-func effectiveLimit(asked int) int {
-	switch {
-	case asked <= 0:
-		return audit.DefaultReadLimit
-	case asked > audit.MaxReadLimit:
-		return audit.MaxReadLimit
-	default:
-		return asked
-	}
-}
+// (The limit in force for a call is audit.EffectiveLimit: the reader's own
+// answer, so a note that quotes it cannot disagree with the read. ⚠️ NOT
+// the ceiling — saying "at most 500" when the call asked for 50 is a true
+// sentence about the wrong thing.)
 
 // skippedNote says how many lines the reader could not take.
 //
