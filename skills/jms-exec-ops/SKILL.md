@@ -35,13 +35,14 @@ displayNames:
 | **下载整个目录** | `jmsx_get_dir`（tar 流，与 `jmsx_put_dir` 对称） |
 | **一台机器的文件直接传到另一台** | `jmsx_relay`（字节不经过本机） |
 | **一个目录从一台机器推到另一台** | `jmsx_relay_dir`（tar 管道对拷，不落本机） |
-| **回查这些传输在堡垒机侧的记录** | `jms_file_transfers`（管理面；谁传的/哪个文件/成没成） |
 | 能不能连上 | `jmsx_reachable` |
 | 想知道连接池里现在有什么 | `jmsx_pool_status` |
 | 想先算一次会话划不划算 | `jmsx_session_cost` |
 | 不知道资产叫什么 | `jmsx_inventory` |
 | **查「谁在这里试过什么、被谁拦下了」** | `jmsx_audit_query`（本机门禁留痕，堡垒机上查不到） |
 <!-- /tools:exec -->
+
+（回查这些传输在堡垒机侧的记录用管理面的 `jms_file_transfers`——谁传的/哪个文件/成没成；它是另一个 server 的工具，不属于上面的清单。）
 
 **危险命令要 `confirm=true`**：命令被判定为 **DANGEROUS**（递归删除、重启、删用户、
 `mkfs`、提权……）时必须带 `confirm=true`，否则**命令不会执行**，工具回你一句

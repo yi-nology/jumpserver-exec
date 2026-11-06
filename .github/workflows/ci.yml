@@ -120,6 +120,27 @@ jobs:
       - name: Run mutation sweep
         run: python3 script/mutate-swagger-guard.py
 
+  # ---- 工具表 ↔ 注册表 机械一致：改了工具忘改文档当场红 --------------------
+  tooldocs:
+    name: Tool docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout kit (the checker lives there)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: yi-nology/jumpserver-kit
+          path: kit
+          persist-credentials: false
+
+      - name: The tool table matches the registry
+        run: python3 kit/script/check_tool_docs.py --policy internal/service/policy/policy.go --count 18 AGENTS.md README.md skills/
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
