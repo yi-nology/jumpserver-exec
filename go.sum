@@ -283,6 +283,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/yi-nology/jumpserver-kit v0.9.1 h1:89ej0p80SMoeGs19T8vAwudH1qJMxOJw7UvIvN0GPjg=
 github.com/yi-nology/jumpserver-kit v0.9.1/go.mod h1:LYlv6pyYTg77cw4oNjBPz4w5baYK3Bur6inMCHyDlZw=
+github.com/yi-nology/jumpserver-kit v0.10.2 h1:Jse7qZMgyt5rTRoPOV6ltxW/87pjlJ40ixOVPJJYiKY=
+github.com/yi-nology/jumpserver-kit v0.10.2/go.mod h1:lnK6D4/CnxLkAcLNNL4l+AAcP/RblzzCl4SvkjZqN3w=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
