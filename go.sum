@@ -214,14 +214,19 @@ github.com/nacos-group/nacos-sdk-go/v2 v2.3.6-0.20260601044846-0e3d1d099507/go.m
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
 github.com/nishanths/predeclared v0.0.0-20200524104333-86fad755b4d3/go.mod h1:nt3d53pc1VYcphSCIaYAJtnPYnr3Zyn8fMq2wvPGPso=
 github.com/oagentkit/guardx v0.19.0 h1:v5FWk9H1ZMBWFz94DtzWRg55TYljA8IYOOGtVhKS7Ko=
+github.com/oagentkit/guardx v0.19.0/go.mod h1:bEbMvf2X5hHNg/LbdZu9tcc076RCSEKFONlpw0cGba4=
 github.com/oagentkit/tools v0.12.0 h1:+c2M4Jty1c25jDv2WB413shtR4sHAzuC3yL8hiQl6qk=
+github.com/oagentkit/tools v0.12.0/go.mod h1:tmvvcnB5nBOUNpAHM4l3sgZiBgxC2bgLtW+ana3Iaj8=
 github.com/oekit/bootstrap v0.6.8 h1:zwlF3I8XyWFBFUugSrV6SZGeVIa9O2Q1SACziz2e7/Y=
 github.com/oekit/bootstrap v0.6.8/go.mod h1:dXP00FI/U76pMLGxEvciTDlLc2pJW3HRk903mVYGqAk=
 github.com/oekit/concurrency v0.25.1 h1:MJ8EqzkTzk282qAOrV1PjzNrxoNo4salrzun7K1zqPE=
+github.com/oekit/concurrency v0.25.1/go.mod h1:jcmGKsn824v7RA3+CubaOqXERFJtsLMpgMSaMZOAxjo=
 github.com/oekit/core v0.12.2 h1:HeuiNUQlPvTo/8wNZzsqqKOzow33z1bDKglpOlBWVUo=
+github.com/oekit/core v0.12.2/go.mod h1:HhBTwYHU5MUp9tfNvHjfZv6P4yglQmn4jKmz98dUIsM=
 github.com/oekit/kitex v0.7.6 h1:vbkyecN5rpzh8ZWAPIT9I2TbVWpSQNI5ceHTgZUO9wg=
 github.com/oekit/kitex v0.7.6/go.mod h1:sgX4EFUcaP8lcy0mf/EkQDp8RtvVbNvk1hQzV5/XuCk=
 github.com/oekit/logx v0.8.3 h1:NPsTpAiGSHyXBT06RUzs577t3PlZquTP+56Q2zZxVSo=
+github.com/oekit/logx v0.8.3/go.mod h1:PImzWIays3sTLxewhKh8wI8xqMlATVJxz6V0ifIgNso=
 github.com/oekit/logx/kitexlog v0.1.8 h1:n3x9Fuswx1EpEZUftEPbA8DesOcG0Uf2qIis/CMJRkc=
 github.com/oekit/logx/kitexlog v0.1.8/go.mod h1:igQIr4IRuSI2/zyCNdbNI2AB1LL9lME50bDob6hyytI=
 github.com/oekit/metrics v0.1.11 h1:uMqUFihnwz3BDHXREZ59/O3EjeZu5lwbAKjElxbuq2U=
@@ -229,6 +234,7 @@ github.com/oekit/metrics v0.1.11/go.mod h1:oSN4VM/a6qq18SLITVCEDzlJby4J+10P3yVqr
 github.com/oekit/network v0.6.1 h1:LOgUlw1hioKPAO0s33NGAfaf9QzMrRWL1c/HxllBaio=
 github.com/oekit/network v0.6.1/go.mod h1:6DlwgZFcfwbSLEhpiiDPlmODsdhFOQIe3dGXvqNJlNs=
 github.com/oekit/pkg v0.34.1 h1:F+jDaHm7qDIeMvELrjUv2yGqJPOG3Qg5UL5VUjpojbU=
+github.com/oekit/pkg v0.34.1/go.mod h1:sVeOtmG1sLY2aSnzFIbUAF2Qoh7G8R5vnWtWmLCv8NM=
 github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc h1:Ak86L+yDSOzKFa7WM5bf5itSOo1e3Xh8bm5YCMUXIjQ=
 github.com/orcaman/concurrent-map v0.0.0-20210501183033-44dafcb38ecc/go.mod h1:Lu3tH6HLW3feq74c2GC+jIMS/K2CFcDWnWD9XkenwhI=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
@@ -283,6 +289,8 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/yi-nology/jumpserver-kit v0.9.1 h1:89ej0p80SMoeGs19T8vAwudH1qJMxOJw7UvIvN0GPjg=
 github.com/yi-nology/jumpserver-kit v0.9.1/go.mod h1:LYlv6pyYTg77cw4oNjBPz4w5baYK3Bur6inMCHyDlZw=
+github.com/yi-nology/jumpserver-kit v0.10.2 h1:Jse7qZMgyt5rTRoPOV6ltxW/87pjlJ40ixOVPJJYiKY=
+github.com/yi-nology/jumpserver-kit v0.10.2/go.mod h1:lnK6D4/CnxLkAcLNNL4l+AAcP/RblzzCl4SvkjZqN3w=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
