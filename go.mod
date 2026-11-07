@@ -16,7 +16,7 @@ require (
 	github.com/oekit/concurrency v0.25.1
 	github.com/oekit/logx v0.8.3
 	github.com/oekit/network v0.6.1
-	github.com/oekit/pkg v0.34.1
+	github.com/oekit/pkg v0.37.1
 	github.com/yi-nology/jumpserver-kit v0.10.4
 	golang.org/x/crypto v0.58.0
 )
@@ -76,7 +76,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.6-0.20260601044846-0e3d1d099507 // indirect
-	github.com/oagentkit/guardx v0.19.0 // indirect
+	github.com/oagentkit/guardx v0.23.0 // indirect
 	github.com/oagentkit/tools v0.12.0 // indirect
 	github.com/oekit/bootstrap v0.6.8 // indirect
 	github.com/oekit/core v0.12.2 // indirect
