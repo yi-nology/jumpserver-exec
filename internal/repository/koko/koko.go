@@ -260,7 +260,12 @@ func OpenTUI(ctx context.Context, cfg Config, asset, account string, timeout tim
 	// accepts the connection and then never speaks SSH would otherwise
 	// hang this call forever — and the fallback is already out of the
 	// picture, because the fallback IS this path.
-	client, err := sshx.Dial(ctx, cfg.address(), cc, sshx.DialOptions{Budget: timeout})
+	client, err := sshx.Dial(ctx, cfg.address(), cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
+	if err != nil && isHandshakeFailure(err) {
+		// 握手级失败重拨一次：连接从未建立、什么都没投递 ⇒ 安全。
+		// （判据与 mint.go 共用；tailscale 链路上握手超时是常态抖动。）
+		client, err = sshx.Dial(ctx, cfg.address(), cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("dial koko %s: %w", cfg.target(), err)
 	}

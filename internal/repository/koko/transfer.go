@@ -1163,34 +1163,31 @@ func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstP
 	}
 
 	pr, pw := io.Pipe()
-	var streamed int64
-	var streamErr error
-	// The source streams beside the copy, not inside it: RunOutput holds the
-	// source's channel for the whole archive, and nothing else may speak on
-	// it until the destination has drunk the last byte. Each side's own
-	// session lock covers its channel — the two locks never cross.
-	// GoSafe, not a bare goroutine — the same rule PutDir's tar writer
-	// follows: a panic in a stream feeder is a logged stack, not a dead
-	// server.
+	// 源端流式输出，所有权与 get_dir 同一套（2026-11-07 修）：写端 pw 由
+	// 源端 goroutine 在 runOutputLocked 返回后关闭，结果经 srcDone channel
+	// 带回——不靠管道 EOF 的隐式次序做跨协程同步（race 检测的盲区）。
+	// 目标端先出错时，先把管道余量抽干再等源端收尾：不抽干则源端
+	// goroutine 永远阻塞在写上（dst 的 tar 死了，没人读 pr），源会话
+	// 被白占到它自己的超时为止。
+	srcDone := make(chan error, 1)
 	async.GoSafeLabeled("koko-relay-dir-src", func() {
-		defer pw.Close()
 		code, err := src.runOutputLocked("tar -cf - -C "+shellx.Quote(srcPath)+" .", pw, timeout)
-		if err != nil {
-			streamErr = fmt.Errorf("tar -cf - -C %s on %s: %w", srcPath, srcAsset, err)
-			return
+		if err == nil && code != 0 {
+			err = fmt.Errorf("tar -cf - -C %s on %s exited %d", srcPath, srcAsset, code)
 		}
-		if code != 0 {
-			streamErr = fmt.Errorf("tar -cf - -C %s on %s exited %d", srcPath, srcAsset, code)
-		}
+		_ = pw.Close()
+		srcDone <- err
 	})
 	// The bridge counts what actually crossed: the transfer's own number,
 	// not a size measured up front (a size that changed mid-stream is
 	// exactly what a recount catches).
-	streamed, err = runInputCounting(dst, "tar -xf - -C "+shellx.Quote(dstPath), pr, timeout)
+	streamed, err := runInputCounting(dst, "tar -xf - -C "+shellx.Quote(dstPath), pr, timeout)
 	if err != nil {
+		_, _ = io.Copy(io.Discard, pr)
+		<-srcDone
 		return nil, err
 	}
-	if streamErr != nil {
+	if streamErr := <-srcDone; streamErr != nil {
 		return nil, streamErr
 	}
 	return &DirRelayResult{
