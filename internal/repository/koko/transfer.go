@@ -20,7 +20,6 @@ package koko
 
 import (
 	"archive/tar"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -343,24 +342,32 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 	}
 
 	start := time.Now()
-	// The archive is buffered whole, then extracted synchronously. The
-	// streamed-pipe variant raced: the extractor owned the writer's close,
-	// an early extract error surfaced as a confusing "closed pipe" from
-	// the writer, and the counts could be read before the extractor
-	// finished (measured 2026-11-06: files on disk, answer an error).
-	// Memory is bounded by the transfer, like jmsx_get_file's whole-file
-	// read — for a tree beyond RAM, fetch it piece by piece.
-	var buf bytes.Buffer
-	code, err := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", &buf, timeout)
-	if err != nil {
-		return nil, err
+	// 流式：远端 tar 输出进管道、本地边收边解——整棵树不进内存。
+	//
+	// ⚠️ 管道所有权（上轮 race 的教训）：写端 pw 由**本函数**在 RunOutput
+	// 返回后关闭；extractor 协程只读 pr、完成后经 channel 报结果，**不碰
+	// pw**。extractor 出错时先把自己的错记下来、再把管道余量抽干才退出——
+	// 不抽干的话写侧会永远阻塞在管道上（无缓冲），谁也别想收尾。
+	pr, pw := io.Pipe()
+	counts := &dirTarCounts{}
+	extractDone := make(chan error, 1)
+	async.GoSafeLabeled("koko-dir-untar", func() {
+		err := readDirTar(pr, localDir, counts)
+		_, _ = io.Copy(io.Discard, pr) // 出错也要把写侧放出来
+		extractDone <- err
+	})
+	code, runErr := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", pw, timeout)
+	_ = pw.Close() // 流到此为止：extractor 的 Read 收到 EOF，开始收尾
+	extractErr := <-extractDone
+	if extractErr != nil {
+		// 本地解包先坏时写侧拿到的是 closed pipe——根因是解包，报它。
+		return nil, extractErr
+	}
+	if runErr != nil {
+		return nil, runErr
 	}
 	if code != 0 {
 		return nil, fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
-	}
-	counts := &dirTarCounts{}
-	if err := readDirTar(&buf, localDir, counts); err != nil {
-		return nil, err
 	}
 	note := ""
 	if counts.skipped > 0 {
