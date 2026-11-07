@@ -153,6 +153,21 @@ type Config struct {
 	// first, the TUI as a fallback), "token" or "tui". Empty means auto.
 	Backend string
 
+	// HandshakeTimeout bounds the SSH handshake on session open. The
+	// default upstream (5s) is right for a datacentre LAN; a path through
+	// a VPN/mesh can stall for longer (measured: 1 in 4 session opens on
+	// a tailscale path timed out at 5s while the network healed around
+	// it). Zero means the 15s default.
+	HandshakeTimeout time.Duration
+
+	// DialRetries is how many times a HANDSHAKE-CLASS session-open
+	// failure is retried (default 1). Only handshake failures retry: the
+	// connection never came up, so nothing was ever delivered — the
+	// never-replay rule does not apply to a dial that delivered nothing.
+	// An auth refusal or a channel-open error is a verdict, not a blip,
+	// and is never retried.
+	DialRetries int
+
 	// API is the bastion's REST client. The connection-token backend needs it
 	// to resolve the asset and to mint the token; the TUI path does not use
 	// it at all.
@@ -194,6 +209,32 @@ type Config struct {
 	// process, one memory. A nil value means "no memory" — every call
 	// then uses the default order, which is the token path first.
 	Memory *BackendMemory
+}
+
+// dialWithHandshakeRetry dials once, and again on handshake-class failures
+// up to cfg.DialRetries times (default one retry). Only the handshake
+// retries: the connection never came up, so nothing was ever delivered and
+// the never-replay rule does not apply to a dial that delivered nothing. An
+// auth refusal or a channel-open error is a verdict, not a blip, and is
+// never retried.
+func dialWithHandshakeRetry(ctx context.Context, addr string, cc *ssh.ClientConfig,
+	timeout time.Duration, cfg Config) (*ssh.Client, error) {
+	handshake := cfg.HandshakeTimeout
+	if handshake <= 0 {
+		handshake = 15 * time.Second // 实测：tailscale 链路 5s 内 1/4 会话开超时
+	}
+	retries := cfg.DialRetries
+	if retries < 0 {
+		retries = 0
+	}
+	var client *ssh.Client
+	var err error
+	for attempt := 0; ; attempt++ {
+		client, err = sshx.Dial(ctx, addr, cc, sshx.DialOptions{Budget: timeout, Handshake: handshake})
+		if err == nil || !isHandshakeFailure(err) || attempt >= retries {
+			return client, err
+		}
+	}
 }
 
 func (c Config) address() string {
@@ -260,12 +301,7 @@ func OpenTUI(ctx context.Context, cfg Config, asset, account string, timeout tim
 	// accepts the connection and then never speaks SSH would otherwise
 	// hang this call forever — and the fallback is already out of the
 	// picture, because the fallback IS this path.
-	client, err := sshx.Dial(ctx, cfg.address(), cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
-	if err != nil && isHandshakeFailure(err) {
-		// 握手级失败重拨一次：连接从未建立、什么都没投递 ⇒ 安全。
-		// （判据与 mint.go 共用；tailscale 链路上握手超时是常态抖动。）
-		client, err = sshx.Dial(ctx, cfg.address(), cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
-	}
+	client, err := dialWithHandshakeRetry(ctx, cfg.address(), cc, timeout, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("dial koko %s: %w", cfg.target(), err)
 	}

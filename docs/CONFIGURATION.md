@@ -146,6 +146,8 @@ jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 | `JMS_KOKO_KEY` | 否 | `~/.ssh/id_rsa` | 私钥路径。**必须是 RSA** |
 | `JMS_KOKO_PORT` | 否 | `2222` | koko 的 SSH 端口 |
 | `JMS_BACKEND` | 否 | `auto` | 会话怎么开：`token`（连接令牌）、`tui`（走一遍 koko 全屏终端）、`auto`（先令牌，令牌机制不可用时回退终端） |
+| `JMS_KOKO_HANDSHAKE_TIMEOUT` | 否 | `15s` | 会话开时 SSH 握手的界。上游默认 5s 适合机房局域网；VPN/组网链路的抖动是秒级到十几秒级（实测 tailscale 链路 1/4 的会话开在 5s 时超时） |
+| `JMS_KOKO_DIAL_RETRIES` | 否 | `1` | 会话开的**握手级**失败重拨次数。只有握手失败重试——连接从未建立、零投递，「已投递绝不重放」不适用于拨号；认证拒绝是判定不是抖动，永不重试 |
 | `JMS_POOL_TTL` | 否 | `2m` | 空闲连接在池里留多久。连接池让同一台机器的第二次调用几乎免费（实测 1.04s → 0.26s）。⚠️ 池里的连接**不出现在堡垒机的会话列表里**（堡垒机记的是每条命令的 exec 会话，跑完就结束）；但资产上会留一个 `sshd-session: <user> [priv]` 进程，所以这个值越长，资产上挂着的进程越多 |
 | `JMS_BACKEND_MEMORY_TTL` | 否 | `10m` | **后端记忆**记多久：记住上次走通的是哪条路（令牌还是终端），下次先试它。记忆只改**顺序**，从不跳过一条路，也从不把资产问题变成兜底。⚠️ **会过期**：过期后回到默认顺序（先令牌）—— 令牌这条路恢复了只能靠**再试一次**找回来。设 `0` 即关闭记忆 |
 | `JMS_READ_ONLY` | 否 | `false` | 只读模式：执行面拒掉 `jmsx_exec` / `jmsx_run` / `jmsx_exec_multi` / `jmsx_put_file` / `jmsx_bg_start`，只留采集与清单 |

@@ -455,13 +455,7 @@ func dialKoko(ctx context.Context, cfg Config, tok connectionToken, timeout time
 		Auth:            []ssh.AuthMethod{ssh.Password(tok.Value)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	client, err := sshx.Dial(ctx, addr, cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
-	if err != nil && isHandshakeFailure(err) {
-		// 握手级失败重拨一次：连接从未建立、一条命令都没投递 ⇒ 重试
-		// 安全（「已投递绝不重放」管的是投递，不是拨号）。实测 tailscale
-		// 链路上约 1/3 的会话开在 5s 握手里超时（i/o timeout），重拨即过。
-		client, err = sshx.Dial(ctx, addr, cc, sshx.DialOptions{Budget: timeout, Handshake: 15 * time.Second})
-	}
+	client, err := dialWithHandshakeRetry(ctx, addr, cc, timeout, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("log into koko at %s as the connection token: %w", addr, err)
 	}
