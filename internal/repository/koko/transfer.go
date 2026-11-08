@@ -233,7 +233,14 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 				}
 				verified = true
 				verifiedFiles = len(counts.manifest)
-				verifyNote = fmt.Sprintf("all %d files verified against the sha256 manifest", verifiedFiles)
+				// ⚠️ 校验的时点边界要写进答复（issue：语义诚实）：manifest 在
+				// 流结束的时刻生成、sha256sum -c 在其后跑——verified 说的是
+				// 「解包那一刻每个文件与 manifest 一致」，不覆盖之后的写入。
+				// put_dir 返回后另一进程覆盖同名文件，verified 仍是 true；
+				// 这不是工具的 bug（职责到校验时点为止），但 note 不说清，
+				// 调用方就会把「校验过」读成「现在仍是」。
+				verifyNote = fmt.Sprintf("all %d files verified against the sha256 manifest"+
+					" (verified at extraction time; later writes are not covered)", verifiedFiles)
 			}
 		}
 	}
