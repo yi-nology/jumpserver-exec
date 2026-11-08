@@ -463,6 +463,15 @@ func (t *tokenBackend) run(command string, stdin io.Reader, stdout, stderr io.Wr
 		// that is bounded too: a wedged transport must not hold the
 		// connection's lock, or every other session on that machine waits
 		// for it as well.
+		//
+		// 协程形状是有界的（GitHub #15）：上面那条 GoSafe 协程是**每命令
+		// 至多一个**的 Wait，命令完成或本分支的 sess.Close() 都会解开它
+		//（channel 关闭时 Wait 必返回）；最坏情形——transport 彻底卡死
+		// Wait 还不回——也只拖到 wedgeGrace 为止，然后这条连接被标记
+		// broken 淘汰，不会复用也不会累积。并发超时（jmsx_exec_multi
+		// 默认 4 台同时撞界）最多是「进行中的命令数」个短命协程，不随
+		// 失败次数爬升。TestConcurrentCommandTimeoutsLeaveNoGoroutinesBehind
+		// 把这个形状钉成测试。
 		sess.Close()
 		select {
 		case <-waited:
