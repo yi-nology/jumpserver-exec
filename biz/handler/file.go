@@ -211,6 +211,12 @@ func registerPutDirTool(r *reg.Registry, cfg config.Config) {
 			Bytes:   jms.OptInt64(res.Bytes),
 			Seconds: jms.OptFloat64(res.Seconds),
 			Stats:   s.Stats(),
+			// The tree that ARRIVED may be smaller than the tree that LEFT,
+			// and the answer says so instead of letting the caller find out
+			// by diffing. ALWAYS filled — zero is an answer too ("nothing
+			// was refused"), not an absence to be guessed at; the IDL
+			// promises "0 = 没有跳过", so the field must appear (issue #12).
+			Skipped: jms.OptInt32(int32(res.Skipped)),
 			Note: jms.Opt("merge semantics: same-name files were overwritten, entries the host already had are untouched. " +
 				"To mirror the local tree exactly, clear the destination first"),
 		}
@@ -219,12 +225,6 @@ func registerPutDirTool(r *reg.Registry, cfg config.Config) {
 			// file the local side hashed landed with those exact bytes.
 			out.Verified = jms.OptBool(true)
 			out.VerifiedFiles = jms.OptInt32(int32(res.VerifiedFiles))
-		}
-		if res.Skipped > 0 {
-			// The tree that ARRIVED is smaller than the tree that LEFT, and
-			// the answer says so instead of letting the caller find out by
-			// diffing (a limit is a fact that is reported, not hidden).
-			out.Skipped = jms.OptInt32(int32(res.Skipped))
 		}
 		if res.Note != "" {
 			out.Note = jms.Opt(res.Note + " | merge semantics: same-name files were overwritten, " +
@@ -327,6 +327,14 @@ func registerGetDirTool(r *reg.Registry, cfg config.Config) {
 			// bytes left the machine (see jmsx_exec).
 			return fail(err)
 		}
+		// The note: the skip list (count + the first 3 names, the same
+		// measure put_dir uses) rides in front of the merge-semantics
+		// reminder, so a caller that lost entries learns WHICH ones
+		// without a second call.
+		note := "merge semantics: same-name files were overwritten, entries this machine already had are untouched"
+		if res.Note != "" {
+			note = res.Note + " | " + note
+		}
 		out := &jmsexec.GetDirResult{
 			Asset:   jms.Opt(res.Asset),
 			Remote:  jms.Opt(res.RemoteDir),
@@ -335,12 +343,13 @@ func registerGetDirTool(r *reg.Registry, cfg config.Config) {
 			Bytes:   jms.OptInt64(res.Bytes),
 			Seconds: jms.OptFloat64(res.Seconds),
 			Stats:   s.Stats(),
-			Note:    jms.Opt("merge semantics: same-name files were overwritten, entries this machine already had are untouched"),
-		}
-		if res.Skipped > 0 {
-			out.Skipped = jms.OptInt32(int32(res.Skipped))
-			out.Note = jms.Opt(res.Note + " | merge semantics: same-name files were overwritten, " +
-				"entries this machine already had are untouched")
+			// ALWAYS filled on the success path — zero included (issue #12):
+			// a skipped entry may be a harmless socket or a load-bearing
+			// device file, and "the field is missing" cannot tell those
+			// apart. The IDL promises "0 = 没有跳过", so the field appears
+			// even when the answer is zero — the same measure put_dir uses.
+			Skipped: jms.OptInt32(int32(res.Skipped)),
+			Note:    jms.Opt(note),
 		}
 		return render.Text(out)
 	})
