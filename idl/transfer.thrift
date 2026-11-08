@@ -92,7 +92,7 @@ struct PutDirResult {
   3: optional string remote,
   /** 传了多少个文件（目录与软链不计）。 */
   4: optional i32 files,
-  /** tar 流的字节数。 */
+  /** 文件内容字节数（逐文件累计；不含 tar 头与 512B 块对齐填充——流字节数会把 23 字节的小树报成 10KB）。 */
   5: optional i64 bytes,
   /** 花了多久。 */
   6: optional double seconds,
@@ -154,7 +154,7 @@ struct RelayDirResult {
   3: optional string dest_asset,
   /** 目的端解包目录。 */
   4: optional string dest_path,
-  /** 归档实际流过的字节数（传输自己的计数）。 */
+  /** 文件内容字节数（流过桥时镜像解析 tar 逐文件累计；不含 tar 头与填充，与 jmsx_put_dir / jmsx_get_dir 同口径）。 */
   5: optional i64 bytes,
   /** 花了多久。 */
   6: optional double seconds,

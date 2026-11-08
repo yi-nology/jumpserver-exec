@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/oekit/concurrency/async"
@@ -97,8 +98,15 @@ type DirTransferResult struct {
 	LocalDir  string
 	RemoteDir string
 	Files     int
-	Bytes     int64
-	Seconds   float64
+	// Bytes is the FILE CONTENT total — the sum of the regular files' own
+	// bytes, counted on the side where the truth is (sent on upload,
+	// extracted on download). It is NOT the tar stream size, which adds a
+	// header per entry and pads every one to 512-byte blocks: reporting the
+	// stream size here once made a 23-byte upload read as 10240 bytes —
+	// the ten-fold lie that put_dir, get_dir and relay_dir now all avoid
+	// by counting content (issue #11).
+	Bytes   int64
+	Seconds float64
 	// Skipped is how many entries the tar stream LEFT BEHIND (sockets and
 	// devices cannot cross it). Zero does not appear in the answer; a
 	// non-zero count means the remote tree is SMALLER than the local one.
@@ -1090,8 +1098,13 @@ type DirRelayResult struct {
 	SourcePath  string
 	DestAsset   string
 	DestPath    string
-	// Bytes is what the archive actually streamed (the transfer's own
-	// count, not an estimate).
+	// Bytes is the FILE CONTENT the tree carried — the sum of the regular
+	// files' own bytes, the SAME number put_dir and get_dir report. It is
+	// counted by mirroring the stream through a tar parser while it crosses
+	// the bridge, not measured up front (a size that changed mid-stream is
+	// exactly what a recount catches) and not the stream size, which pads
+	// every file to 512-byte blocks and would be a ten-fold lie for a tree
+	// of small files (issue #11: two tools, one field name, two meanings).
 	Bytes   int64
 	Seconds float64
 	// Note carries the merge-semantics reminder and anything else the
@@ -1185,10 +1198,12 @@ func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstP
 		_ = pw.Close()
 		srcDone <- err
 	})
-	// The bridge counts what actually crossed: the transfer's own number,
-	// not a size measured up front (a size that changed mid-stream is
-	// exactly what a recount catches).
-	streamed, err := runInputCounting(dst, "tar -xf - -C "+shellx.Quote(dstPath), pr, timeout)
+	// The bridge counts the FILE CONTENT that crossed: the stream is
+	// mirrored through a tar parser while the destination drinks it, and
+	// the answer reports the files' own bytes — the same number put_dir
+	// and get_dir report, not the stream size with its headers and padding
+	// (issue #11: 两个工具口径必须一致).
+	content, err := runInputContentCounting(dst, "tar -xf - -C "+shellx.Quote(dstPath), pr, timeout)
 	if err != nil {
 		_, _ = io.Copy(io.Discard, pr)
 		<-srcDone
@@ -1202,25 +1217,108 @@ func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstP
 		SourcePath:  srcPath,
 		DestAsset:   dstAsset,
 		DestPath:    dstPath,
-		Bytes:       streamed,
+		Bytes:       content,
 		Seconds:     time.Since(started).Seconds(),
 		Note: "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
+			"bytes counts FILE CONTENT only (tar headers and per-file padding are not counted), the same measure put_dir reports; " +
 			"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven",
 	}, nil
 }
 
-// runInputCounting is RunInput with a counting reader in front: how many
-// bytes the destination actually drank.
-func runInputCounting(s *Session, command string, r io.Reader, timeout time.Duration) (int64, error) {
+// runInputContentCounting is RunInput with a tar-parsing mirror in front:
+// the destination drinks the stream as before, and the FILE CONTENT bytes
+// (the regular files' own sizes, headers and padding excluded) are counted
+// while the same bytes cross. That is the number put_dir and get_dir
+// report — relay_dir used to report the stream size here, which read a
+// 23-byte tree as 10240 bytes (issue #11).
+func runInputContentCounting(s *Session, command string, r io.Reader, timeout time.Duration) (int64, error) {
 	cr := &countingReader{r: r}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.backend == nil || s.closed {
 		return 0, fmt.Errorf("the session is closed")
 	}
-	_, err := s.backend.RunInput(command, cr, timeout)
-	return cr.n, err
+	counter := newTarContentCounter(cr)
+	_, err := s.backend.RunInput(command, counter, timeout)
+	counter.finish()
+	return counter.count(), err
 }
+
+// tarContentCounter counts the FILE CONTENT bytes of a tar stream as it
+// flows past. Read forwards every byte to the destination unchanged and,
+// in lockstep, mirrors the same bytes into a parser goroutine that walks
+// the archive and sums the regular files' payload sizes.
+//
+// The mirror is deliberately one-directional: when the stream is corrupt
+// the parser stops and the mirror is marked broken, but the DESTINATION
+// still receives every byte — the count gives up, the transfer does not
+// (the extract on the destination is what reports a corrupt stream, and
+// its error is the one the caller sees).
+type tarContentCounter struct {
+	src     io.Reader
+	mirrorW io.WriteCloser
+
+	// mirrorBroken says the parser stopped: stop mirroring (the writes
+	// would only fail again) and keep forwarding.
+	mirrorBroken atomic.Bool
+
+	content atomic.Int64
+	// done closes when the parser goroutine has finished, so finish can
+	// wait for the count to settle instead of reading it mid-flight.
+	done chan struct{}
+}
+
+// newTarContentCounter wraps src and starts the parser goroutine beside it.
+func newTarContentCounter(src io.Reader) *tarContentCounter {
+	c := &tarContentCounter{src: src, done: make(chan struct{})}
+	mirrorR, mirrorW := io.Pipe()
+	c.mirrorW = mirrorW
+	// GoSafe, not bare go: a panic here must log a stack, not kill the
+	// server — the same rule as every other beside-the-stream goroutine.
+	async.GoSafeLabeled("koko-relay-dir-count", func() {
+		defer close(c.done)
+		defer mirrorR.Close() // 先关读侧：写侧卡着的镜像写立刻失败，谁也不等谁
+		tr := tar.NewReader(mirrorR)
+		for {
+			hdr, err := tr.Next()
+			if err != nil {
+				return // EOF（真结束）或乱流：都到此为止，计数保留已算出的部分
+			}
+			if hdr.Typeflag == tar.TypeReg {
+				// 只数完整的文件：半个文件不是字节数，是事故
+				// （readDirTar 同一纪律——copy 出错不计入 bytes）。
+				n, cerr := io.Copy(io.Discard, tr)
+				if cerr != nil {
+					return
+				}
+				c.content.Add(n)
+			}
+		}
+	})
+	return c
+}
+
+func (c *tarContentCounter) Read(p []byte) (int, error) {
+	n, err := c.src.Read(p)
+	if n > 0 && !c.mirrorBroken.Load() {
+		if _, werr := c.mirrorW.Write(p[:n]); werr != nil {
+			// The parser is gone (corrupt stream, or it already finished).
+			// Only the MIRROR is off: the destination keeps its bytes.
+			c.mirrorBroken.Store(true)
+		}
+	}
+	return n, err
+}
+
+// finish closes the stream and waits for the parser: the mirror's Write
+// returns only after the parser has READ those bytes, so by the time the
+// destination saw EOF every forwarded byte has been counted.
+func (c *tarContentCounter) finish() {
+	_ = c.mirrorW.Close()
+	<-c.done
+}
+
+func (c *tarContentCounter) count() int64 { return c.content.Load() }
 
 type countingReader struct {
 	r io.Reader
