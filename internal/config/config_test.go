@@ -217,3 +217,38 @@ func TestAutoStartsWithoutTheTerminalVariables(t *testing.T) {
 		t.Errorf("the terminal variables were filled in: host=%q user=%q", cfg.Koko.Host, cfg.Koko.User)
 	}
 }
+
+// The credential precedence (issue #14): the plane's own
+// JUMPSERVER_EXEC_TOKEN wins when set; the shared JUMPSERVER_TOKEN is the
+// fallback it always was, so a deployment that never sets the new variable
+// behaves exactly as before.
+func TestTheDedicatedCredentialWinsOverTheSharedOne(t *testing.T) {
+	t.Setenv("JUMPSERVER_TOKEN", "shared-token")
+	t.Setenv("JUMPSERVER_EXEC_TOKEN", "")
+	cfg := load(t)
+	if cfg.API.Token != "shared-token" {
+		t.Errorf("Token = %q, want the shared variable's value as the fallback", cfg.API.Token)
+	}
+	if cfg.CredentialDedicated {
+		t.Error("CredentialDedicated = true with no dedicated slot set")
+	}
+
+	t.Setenv("JUMPSERVER_EXEC_TOKEN", "dedicated-token")
+	cfg = load(t)
+	if cfg.API.Token != "dedicated-token" {
+		t.Errorf("Token = %q, want the dedicated credential to win", cfg.API.Token)
+	}
+	if !cfg.CredentialDedicated {
+		t.Error("CredentialDedicated = false while the dedicated slot is in use")
+	}
+
+	// A whitespace-only dedicated slot is NOT a dedicated credential: it is
+	// the shared variable standing, and the doctor must not report a
+	// separation that is not there.
+	t.Setenv("JUMPSERVER_EXEC_TOKEN", "   ")
+	cfg = load(t)
+	if cfg.API.Token != "shared-token" || cfg.CredentialDedicated {
+		t.Errorf("a blank dedicated slot was treated as one: token=%q dedicated=%v",
+			cfg.API.Token, cfg.CredentialDedicated)
+	}
+}

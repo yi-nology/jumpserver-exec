@@ -72,6 +72,7 @@ chmod +x jumpserver-exec-linux-amd64
 ⚠️ `JUMPSERVER_URL` 填部署的根地址，**不要带 `/api/v1`**（客户端自己拼），也不带结尾斜杠。
 ⚠️ `JMS_BASTION_HOST` 填堡垒机主机名（koko 的 2222 端口）。
 ⚠️ 私钥的 passphrase 别放进 env —— 走 `ssh-agent`，或给一个只有你能读的密钥文件。
+⚠️ **最小权限**：上面这枚 token 若与管理面（jumpserver-mgmt）共用，执行面就持有管理面的权限面。给执行面单独建一个窄权限账户，把它的 PrivateToken 填进 `JUMPSERVER_EXEC_TOKEN`（设了就赢过 `JUMPSERVER_TOKEN`）——见 `docs/CONFIGURATION.md` §3.2.1。`--doctor` 的 `credential` 行会报告你现在处在哪种情况。
 
 ### 2.3 接线（HTTP / RPC 面，可选）
 

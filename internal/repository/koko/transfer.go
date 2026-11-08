@@ -30,6 +30,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -293,6 +294,85 @@ func ifPlural(n int) string {
 	return "ies"
 }
 
+// DirStats is what a LOCAL directory holds, counted the way a directory
+// upload would carry it: the numbers put_dir's dry run answers with.
+type DirStats struct {
+	// Files is how many REGULAR files the stream would carry (directories
+	// and symlinks are structure, not files — the same rule as PutDir's
+	// counts.files).
+	Files int
+	// Bytes is the content size those files would stream (not the tar
+	// overhead around them).
+	Bytes int64
+	// Skipped is what the stream would LEAVE BEHIND (sockets and devices
+	// cannot cross a tar stream) — the same skip list PutDir reports.
+	Skipped int
+	// SkippedNames names the first few skipped entries, for the note.
+	SkippedNames []string
+}
+
+// PrescanDir counts what a directory upload WOULD carry, without opening a
+// session or reading a single file's content: a local walk with lstat only.
+//
+// It is put_dir's dry-run engine (issue #20): the planning numbers — how
+// many files, how many bytes, what gets skipped — come from THIS machine,
+// at zero bastion cost, so the agent can shard a too-large tree, clean the
+// skipped entries, or catch a wrong path BEFORE any session exists.
+//
+// ⚠️ The counts are pinned to writeDirTar's (the test walks both over the
+// same fixture): a prescan that drifted from the stream would rehearse an
+// upload that never happens. The walk mirrors it branch for branch —
+// directories are structure, symlinks ride as symlinks, regular files count
+// with their content size, everything else is skipped and named.
+func PrescanDir(root string) (*DirStats, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", root, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", root)
+	}
+	st := &DirStats{}
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == root {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case d.IsDir():
+			return nil
+		case info.Mode()&fs.ModeSymlink != 0:
+			return nil
+		case info.Mode().IsRegular():
+			st.Files++
+			st.Bytes += info.Size()
+			return nil
+		default:
+			// Sockets and devices cannot travel a tar stream — the same
+			// skip writeDirTar makes, counted the same way.
+			st.Skipped++
+			if len(st.SkippedNames) < 3 {
+				rel, rerr := filepath.Rel(root, p)
+				if rerr != nil {
+					rel = p
+				}
+				st.SkippedNames = append(st.SkippedNames, filepath.ToSlash(rel))
+			}
+			return nil
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
 // GetDir downloads a directory from the asset as one tar stream on the exec
 // channel's stdout, extracted HERE as it arrives — the mirror of PutDir, and
 // the honest answer to "agent 要拉回一个远端目录" that until now meant
@@ -301,6 +381,22 @@ func ifPlural(n int) string {
 // Same channel discipline as PutDir: the connection-token path only (the
 // TUI pane cannot carry a binary stream — the error says so, not a slow
 // fallback), and the streamed tar is one indivisible use of the connection.
+//
+// The stream deadline SCALES WITH THE TREE, the same formula PutDir applies
+// to its own (locally-known) size: `du -sk` probes the remote tree first —
+// one command, a metadata walk that never reads file content, so the probe
+// is cheap next to the transfer it right-sizes (issue #22: a fixed deadline
+// kills a large remote tree on a slow link mid-stream). A probe that fails
+// or answers nothing scales nothing: the caller's base timeout is used, and
+// the download proceeds.
+//
+// Failure is not half a download that looks like success: a stream or
+// extract failure after the extractor started leaves a PARTIAL local tree,
+// so when this call created local_dir the tree is removed and the error
+// says so ("partial extraction removed"); when local_dir already existed
+// the pre-existing files cannot be told apart from the extracted ones, so
+// nothing is deleted and the error says the tree is PARTIAL — do not use
+// it as complete.
 //
 // Extraction is defensive: an entry whose name is absolute or climbs out of
 // the destination ("..", "../x", "/etc/passwd") is SKIPPED and counted, not
@@ -337,6 +433,23 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 	} else if strings.Contains(out, "JMSX_NO_TAR") {
 		return nil, fmt.Errorf("tar is not installed on %s; directory download streams a tar archive remotely", s.asset)
 	}
+
+	// The tree's size on the far side scales the deadline (issue #22). The
+	// probe is du -sk — POSIX, metadata-only, one command. A probe that
+	// fails (no du, unreadable entries, an odd shell) answers 0, and 0
+	// scales nothing: the base deadline stands.
+	kb := remoteTreeKB(runLocked, remoteDir, timeout)
+	streamTimeout := dirStreamTimeout(timeout, kb*1024)
+
+	// Whether the destination existed BEFORE this call decides what a
+	// failure may undo: a directory this call created can be removed whole;
+	// one the caller already had cannot — the extracted files and the
+	// pre-existing ones are indistinguishable there, so only the honest
+	// word ("this tree is partial") is available.
+	existed := true
+	if _, statErr := os.Stat(localDir); os.IsNotExist(statErr) {
+		existed = false
+	}
 	if err := os.MkdirAll(localDir, 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir %s: %w", localDir, err)
 	}
@@ -356,18 +469,15 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 		_, _ = io.Copy(io.Discard, pr) // 出错也要把写侧放出来
 		extractDone <- err
 	})
-	code, runErr := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", pw, timeout)
+	code, runErr := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", pw, streamTimeout)
 	_ = pw.Close() // 流到此为止：extractor 的 Read 收到 EOF，开始收尾
 	extractErr := <-extractDone
-	if extractErr != nil {
-		// 本地解包先坏时写侧拿到的是 closed pipe——根因是解包，报它。
-		return nil, extractErr
-	}
-	if runErr != nil {
-		return nil, runErr
-	}
-	if code != 0 {
-		return nil, fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	if extractErr != nil || runErr != nil || code != 0 {
+		// 半棵树不是答案（issue #22）：解包已经开始 ⇒ local_dir 里此刻是
+		// 一棵部分树。本调用建的就整个撤掉；本来就在的撤不掉（分不出
+		// 哪些是预存的）——错误里明说，别让部分树看起来像完整答案。
+		// 原始错误用 %w 带走（投递状态住在错误链上，拍平就丢了）。
+		return nil, s.partialTreeError(localDir, remoteDir, existed, extractErr, runErr, code)
 	}
 	note := ""
 	if counts.skipped > 0 {
@@ -384,6 +494,59 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 		Skipped:   counts.skipped,
 		Note:      note,
 	}, nil
+}
+
+// partialTreeError is the failure GetDir reports after the extractor started:
+// the ORIGINAL error is the root cause and rides first (%w keeps its delivery
+// state), the partial-tree verdict rides with it. It is a method so the
+// message can name the asset like the rest of the layer's errors do.
+//
+// extractErr wins when set (the local untar broke first — the write side
+// saw a closed pipe, which is the symptom, not the cause); then the stream's
+// own error; then a non-zero exit.
+func (s *Session) partialTreeError(localDir, remoteDir string, existed bool, extractErr, runErr error, code int) error {
+	origin := extractErr
+	switch {
+	case origin != nil:
+		// 本地解包先坏时写侧拿到的是 closed pipe——根因是解包，报它。
+	case runErr != nil:
+		origin = runErr
+	default:
+		origin = fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
+	}
+	if !existed {
+		if rmErr := os.RemoveAll(localDir); rmErr != nil {
+			return fmt.Errorf("%w (the download failed and the PARTIALLY EXTRACTED tree at %s "+
+				"could not be removed either: %v — remove it yourself; do not use it as complete)",
+				origin, localDir, rmErr)
+		}
+		return fmt.Errorf("%w (partial extraction removed: the failed download's half-tree at %s was deleted)", origin, localDir)
+	}
+	return fmt.Errorf("%w (the local tree at %s is PARTIALLY extracted — some of its files were overwritten "+
+		"by this failed download and it cannot be told which; do not use it as complete; "+
+		"re-download onto a fresh directory to replace it)", origin, localDir)
+}
+
+// remoteTreeKB probes the remote tree's size with `du -sk` and answers it in
+// KiB. A probe that fails, is refused, or answers garbage answers 0 — the
+// caller scales nothing. The probe's failure is NOT the download's failure:
+// an odd shell must not take the transfer down with it.
+func remoteTreeKB(runLocked func(string, time.Duration) (string, error), remoteDir string, timeout time.Duration) int64 {
+	out, err := runLocked(fmt.Sprintf("du -sk %s 2>/dev/null", shellx.Quote(remoteDir)), timeout)
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) == 0 {
+			continue
+		}
+		kb, perr := strconv.ParseInt(fields[0], 10, 64)
+		if perr == nil && kb > 0 {
+			return kb
+		}
+	}
+	return 0
 }
 
 // readDirTar extracts a tar stream into root as it arrives, counting what
@@ -1197,9 +1360,25 @@ func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstP
 		DestPath:    dstPath,
 		Bytes:       streamed,
 		Seconds:     time.Since(started).Seconds(),
-		Note: "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
-			"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven",
+		Note:        relayDirNote(),
 	}, nil
+}
+
+// relayDirNote is the note every relay_dir answer carries: the semantics
+// the caller must read before trusting the copy.
+//
+// It is a function of its own so the sentence about the bytes' MEANING has
+// one home (issue #21): an agent that reads `bytes=10240` for a tiny tree
+// assumes the tree is huge — the number is right and the intuition is wrong.
+// The stream counts tar structure and 512-byte block padding, so a small
+// tree's overhead dominates (measured round-trip 2026-11-07: a 2-file,
+// 15-byte-content tree reported 10240 stream bytes) and a large one
+// converges to its content size. Extracted so a test can pin the sentence.
+func relayDirNote() string {
+	return "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
+		"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven; " +
+		"bytes counts the STREAM, tar structure and block padding included: a small tree's overhead dominates " +
+		"(a 2-file, 15-byte tree streams 10240 bytes) and a large tree converges to its content size"
 }
 
 // runInputCounting is RunInput with a counting reader in front: how many

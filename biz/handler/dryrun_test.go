@@ -1,9 +1,14 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
 	"github.com/yi-nology/jumpserver-kit/model/jms"
@@ -95,4 +100,89 @@ func TestCommandResultCarriesTheDryRunFields(t *testing.T) {
 		t.Errorf("the wire form lost the dry-run fields: %s", b)
 	}
 	_ = jmsexec.CommandResult{}
+}
+
+// A put_dir rehearsal answers from the LOCAL prescan alone: the call must
+// not reach for a session (there is no bastion in this test, so a session
+// attempt would fail the call outright), and the planning numbers are the
+// tree's own (issue #20).
+//
+// The confirm flag is still required by the tool's registry gate — the flag
+// admits that the tool may write; the rehearsal itself writes nothing.
+func TestPutDirDryRunAnswersFromTheLocalPrescan(t *testing.T) {
+	cs := testsupport.NewSession(t, "dryrun-putdir", reg.Options{Policy: policy.Table},
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "app.conf"), []byte("listen :8080"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sub", "run.sh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	out := testsupport.CallToolJSON(t, cs, "jmsx_put_dir", map[string]any{
+		"asset":       "10.0.0.1",
+		"local_path":  dir,
+		"remote_path": "/opt/app",
+		"dry_run":     true,
+		"confirm":     true,
+	})
+	if out["dry_run"] != true {
+		t.Errorf("dry_run = %v, want true", out["dry_run"])
+	}
+	if out["would_execute"] != true {
+		t.Errorf("would_execute = %v, want true (a finished prescan is the green light)", out["would_execute"])
+	}
+	if out["risk"] != "destructive" {
+		t.Errorf("risk = %v, want the catalogue class", out["risk"])
+	}
+	if out["files"] != float64(2) {
+		t.Errorf("files = %v, want 2", out["files"])
+	}
+	if out["bytes"] != float64(len("listen :8080")+len("#!/bin/sh\n")) {
+		t.Errorf("bytes = %v, want the content total", out["bytes"])
+	}
+	if _, ok := out["stats"]; ok {
+		t.Errorf("the rehearsal carries session stats: %v", out)
+	}
+	note, _ := out["note"].(string)
+	if !strings.Contains(note, "local prescan") {
+		t.Errorf("the note does not say the numbers came from a prescan: %s", note)
+	}
+}
+
+// A prescan of a path that is not a directory is refused with the error's
+// own text — the rehearsal must not answer about a tree the upload could
+// not walk either.
+func TestPutDirDryRunRefusesANonDirectory(t *testing.T) {
+	cs := testsupport.NewSession(t, "dryrun-putdir-bad", reg.Options{Policy: policy.Table},
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+	dir := t.TempDir()
+	file := filepath.Join(dir, "f.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "jmsx_put_dir",
+		Arguments: map[string]any{
+			"asset":       "10.0.0.1",
+			"local_path":  file,
+			"remote_path": "/opt/app",
+			"dry_run":     true,
+			"confirm":     true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("a file was rehearsed as a directory: %s", testsupport.ToolText(t, res))
+	}
+	if txt := testsupport.ToolText(t, res); !strings.Contains(txt, "is not a directory") {
+		t.Errorf("the refusal does not say what was wrong: %s", txt)
+	}
 }

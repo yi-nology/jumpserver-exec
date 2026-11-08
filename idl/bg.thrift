@@ -35,6 +35,10 @@ struct BgStartResult {
  *
  * state 是 running 还是 finished；finished 时 exit_code 是命令的退出码
  * （字符串，因为它是从机器上的标记文件里读出来的）。
+ *
+ * 清理策略（#19）：输出与退出码文件不自动清——RUNNING 时它们正被任务
+ * 写着，删了会丢输出；FINISHED 后由调用方显式带 cleanup=true 清理。
+ * 没带时 note 会说垃圾在哪，调用方至少知道它存在。
  */
 struct BgCheckResult {
   1: optional string asset,
@@ -46,4 +50,8 @@ struct BgCheckResult {
   4: optional string exit_code,
   /** 下一步该做什么。 */
   5: optional string next,
+  /** 这次检查是否顺带清掉了输出与退出码文件（cleanup=true 且已 FINISHED 才为 true）。 */
+  6: optional bool cleaned,
+  /** 一句话说明这次答复是什么（未清理时垃圾在哪、怎么清，在这里）。 */
+  7: optional string note,
 }
