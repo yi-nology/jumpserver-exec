@@ -169,13 +169,19 @@ struct RelayDirResult {
   3: optional string dest_asset,
   /** 目的端解包目录。 */
   4: optional string dest_path,
-  /** 归档实际流过的字节数（传输自己的计数）。 */
+  /**
+   * 归档实际流过的字节数（传输自己的计数）。
+   *
+   * ⚠️ 它是**流**字节数，tar 结构与 512B 块 padding 都算在内：小树上开销
+   * 占比天然高（实测：2 文件 15 字节内容的树报 10240——数字是对的，直觉
+   * 是错的），大树上趋近内容大小。别拿它当内容大小比。
+   */
   5: optional i64 bytes,
   /** 花了多久。 */
   6: optional double seconds,
   /** 这个会话的账。 */
   7: optional session.SessionStats stats,
-  /** 合并语义提醒与「无到达自证」的说明。 */
+  /** 合并语义提醒与「无到达自证」的说明（含 bytes 语义：小树 tar 开销占比高）。 */
   8: optional string note,
 }
 

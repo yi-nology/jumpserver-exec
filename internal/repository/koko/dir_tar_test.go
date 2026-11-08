@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -83,5 +84,25 @@ func TestWriteDirTarStreamsTheTreeRelative(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("symlink entry missing or wrong: %v", links)
+	}
+}
+
+// The relay_dir note is the one place the STREAM-bytes semantics is stated
+// (issue #21): an agent reading bytes=10240 for a tiny tree assumes the
+// tree is huge — the number is right (tar structure + block padding) and
+// the intuition is wrong. This pins the sentence so a note rewrite cannot
+// quietly drop it.
+func TestRelayDirNoteSaysWhatTheStreamBytesMean(t *testing.T) {
+	note := relayDirNote()
+	for _, want := range []string{
+		"merge semantics",
+		"no arrival proof",
+		"bytes counts the STREAM",
+		"a small tree's overhead dominates",
+		"converges to its content size",
+	} {
+		if !strings.Contains(note, want) {
+			t.Errorf("the relay_dir note lost %q:\n%s", want, note)
+		}
 	}
 }

@@ -1276,9 +1276,25 @@ func RelayDir(ctx context.Context, cfg Config, srcAsset, srcPath, dstAsset, dstP
 		DestPath:    dstPath,
 		Bytes:       streamed,
 		Seconds:     time.Since(started).Seconds(),
-		Note: "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
-			"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven",
+		Note:        relayDirNote(),
 	}, nil
+}
+
+// relayDirNote is the note every relay_dir answer carries: the semantics
+// the caller must read before trusting the copy.
+//
+// It is a function of its own so the sentence about the bytes' MEANING has
+// one home (issue #21): an agent that reads `bytes=10240` for a tiny tree
+// assumes the tree is huge — the number is right and the intuition is wrong.
+// The stream counts tar structure and 512-byte block padding, so a small
+// tree's overhead dominates (measured round-trip 2026-11-07: a 2-file,
+// 15-byte-content tree reported 10240 stream bytes) and a large one
+// converges to its content size. Extracted so a test can pin the sentence.
+func relayDirNote() string {
+	return "merge semantics: same-name files were overwritten on the destination, entries it already had are untouched; " +
+		"no arrival proof on a straight-through stream — run a checksum on the destination (jmsx_exec) if this tree must be proven; " +
+		"bytes counts the STREAM, tar structure and block padding included: a small tree's overhead dominates " +
+		"(a 2-file, 15-byte tree streams 10240 bytes) and a large tree converges to its content size"
 }
 
 // runInputCounting is RunInput with a counting reader in front: how many
