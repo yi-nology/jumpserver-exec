@@ -170,6 +170,7 @@ func registerPutDirTool(r *reg.Registry, cfg config.Config) {
 		LocalPath  string `json:"local_path" jsonschema:"directory on this machine to upload"`
 		RemotePath string `json:"remote_path" jsonschema:"destination directory on the asset; created if missing"`
 		Timeout    int    `json:"timeout,omitempty" jsonschema:"seconds per internal step (default 300)"`
+		DryRun     bool   `json:"dry_run,omitempty" jsonschema:"rehearse the upload from a LOCAL prescan only: files, bytes and skipped entries, no session, nothing sent. Still pass confirm=true (the tool's gate demands it; the rehearsal writes nothing)"`
 		Confirm    bool   `json:"confirm" jsonschema:"must be true; this writes files on the machine, overwriting same-name ones"`
 	}
 
@@ -179,7 +180,9 @@ func registerPutDirTool(r *reg.Registry, cfg config.Config) {
 			"Use it to deploy a config tree, a script bundle or a small application directory in one call instead of one jmsx_put_file per file. " +
 			"The semantics are MERGE, not mirror: the archive extracts into the destination, overwriting same-name files and leaving " +
 			"everything the host already had alone — to make the remote tree exactly the local one, clear the destination first " +
-			"(jmsx_exec) and then upload. Requires the connection-token path and tar on the asset; the koko terminal backend " +
+			"(jmsx_exec) and then upload. With dry_run=true it rehearses instead: the answer's files/bytes/skipped come from a " +
+			"LOCAL prescan, so deciding to shard a too-large tree or clean skipped entries costs no session at all. " +
+			"Requires the connection-token path and tar on the asset; the koko terminal backend " +
 			"answers honestly that it cannot stream a binary payload.",
 		OutputSchema: render.Schema[jmsexec.PutDirResult]()}, func(ctx context.Context, _ *mcp.CallToolRequest, args putDirArgs) (*mcp.CallToolResult, any, error) {
 		if strings.TrimSpace(args.LocalPath) == "" {
@@ -187,6 +190,23 @@ func registerPutDirTool(r *reg.Registry, cfg config.Config) {
 		}
 		if strings.TrimSpace(args.RemotePath) == "" {
 			return render.Failf("remote_path is required")
+		}
+		// The dry run answers BEFORE any session exists: the prescan is
+		// local, and everything the real call would stream is already known
+		// here (issue #20 — the planning numbers must not cost a bastion
+		// round trip). The verdict vocabulary (dry_run / would_execute /
+		// blocked / risk) is filled by the shared writer, so this rehearsal
+		// reads exactly like the command tools' ones; would_execute=true
+		// because nothing refused it — a finished prescan IS the green
+		// light. The confirm gate sits in the registry, so the rehearsal
+		// still needs confirm=true to reach this code at all: the flag
+		// admits the tool may write, and the rehearsal writes nothing.
+		if args.DryRun {
+			res, err := dryRunPutDir(args.Asset, args.LocalPath, args.RemotePath)
+			if err != nil {
+				return render.Failf("%v", err)
+			}
+			return render.Text(res)
 		}
 		timeout := commandTimeout(args.Timeout, 300)
 

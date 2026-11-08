@@ -82,6 +82,13 @@ struct GetFileResult {
  *
  * 完整性证据是 tar 自己的退出码 + 逐文件的本地计数；目录级没有可靠的
  * 「两边逐字节相等」的廉价判据（合并语义下远端本来就多东西）。
+ *
+ * 演练（dry_run=true，#20）：只做本地预扫（files/bytes/skipped 来自本地
+ * walk，lstat 不读内容），**不开会话、不碰堡垒机**——树太大就分片、有
+ * skipped 先清理、路径错了当场发现，全部发生在零会话成本里。
+ * would_execute=true 表示演练本身没有拒绝什么（预扫完成，confirm 满足后
+ * 就会真传）。与命令工具的演练词汇同构（dry_run / would_execute /
+ * blocked / risk），演练不是拒绝。
  */
 struct PutDirResult {
   /** 目标资产。 */
@@ -106,6 +113,14 @@ struct PutDirResult {
   10: optional bool verified,
   /** 远端核对过的文件数。 */
   11: optional i32 verified_files,
+  /** 这次答复是演练（本地预扫）：没有开会话，什么都没传。 */
+  12: optional bool dry_run,
+  /** 演练时：confirm 满足后会不会真的执行。 */
+  13: optional bool would_execute,
+  /** 演练时为什么不会执行（put_dir 的确认门在门禁层，这里恒为空——预扫完成就是会执行）。 */
+  14: optional string blocked,
+  /** 工具目录对这个工具的风险分级（destructive：会覆盖机器上的同名文件）。 */
+  15: optional string risk,
 }
 
 /**

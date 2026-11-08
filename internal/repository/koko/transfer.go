@@ -293,6 +293,85 @@ func ifPlural(n int) string {
 	return "ies"
 }
 
+// DirStats is what a LOCAL directory holds, counted the way a directory
+// upload would carry it: the numbers put_dir's dry run answers with.
+type DirStats struct {
+	// Files is how many REGULAR files the stream would carry (directories
+	// and symlinks are structure, not files — the same rule as PutDir's
+	// counts.files).
+	Files int
+	// Bytes is the content size those files would stream (not the tar
+	// overhead around them).
+	Bytes int64
+	// Skipped is what the stream would LEAVE BEHIND (sockets and devices
+	// cannot cross a tar stream) — the same skip list PutDir reports.
+	Skipped int
+	// SkippedNames names the first few skipped entries, for the note.
+	SkippedNames []string
+}
+
+// PrescanDir counts what a directory upload WOULD carry, without opening a
+// session or reading a single file's content: a local walk with lstat only.
+//
+// It is put_dir's dry-run engine (issue #20): the planning numbers — how
+// many files, how many bytes, what gets skipped — come from THIS machine,
+// at zero bastion cost, so the agent can shard a too-large tree, clean the
+// skipped entries, or catch a wrong path BEFORE any session exists.
+//
+// ⚠️ The counts are pinned to writeDirTar's (the test walks both over the
+// same fixture): a prescan that drifted from the stream would rehearse an
+// upload that never happens. The walk mirrors it branch for branch —
+// directories are structure, symlinks ride as symlinks, regular files count
+// with their content size, everything else is skipped and named.
+func PrescanDir(root string) (*DirStats, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", root, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", root)
+	}
+	st := &DirStats{}
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if p == root {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case d.IsDir():
+			return nil
+		case info.Mode()&fs.ModeSymlink != 0:
+			return nil
+		case info.Mode().IsRegular():
+			st.Files++
+			st.Bytes += info.Size()
+			return nil
+		default:
+			// Sockets and devices cannot travel a tar stream — the same
+			// skip writeDirTar makes, counted the same way.
+			st.Skipped++
+			if len(st.SkippedNames) < 3 {
+				rel, rerr := filepath.Rel(root, p)
+				if rerr != nil {
+					rel = p
+				}
+				st.SkippedNames = append(st.SkippedNames, filepath.ToSlash(rel))
+			}
+			return nil
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
 // GetDir downloads a directory from the asset as one tar stream on the exec
 // channel's stdout, extracted HERE as it arrives — the mirror of PutDir, and
 // the honest answer to "agent 要拉回一个远端目录" that until now meant

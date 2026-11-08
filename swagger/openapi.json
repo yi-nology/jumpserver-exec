@@ -93,6 +93,10 @@
           "path": {
             "type": "string",
             "description": "the output path returned by jmsx_bg_start"
+          },
+          "cleanup": {
+            "type": "boolean",
+            "description": "after a FINISHED check, also remove the output file and the exit marker from the asset (they can reach GBs for a verbose task). Refused while the task is still running: the files are its live output"
           }
         },
         "required": [
@@ -414,6 +418,10 @@
           "timeout": {
             "type": "integer",
             "description": "seconds per internal step (default 300)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "rehearse the upload from a LOCAL prescan only: files, bytes and skipped entries, no session, nothing sent. Still pass confirm=true (the tool's gate demands it; the rehearsal writes nothing)"
           },
           "confirm": {
             "type": "boolean",
@@ -807,6 +815,18 @@
             ]
           },
           "next": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cleaned": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "note": {
             "type": [
               "null",
               "string"
@@ -2381,6 +2401,30 @@
             ],
             "minimum": -2147483648,
             "maximum": 2147483647
+          },
+          "dry_run": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "would_execute": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": true
@@ -3401,7 +3445,7 @@
     },
     "/api/v1/tools/jmsx_bg_check/invoke": {
       "post": {
-        "description": "[risk: read] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file.",
+        "description": "[risk: read] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file. The output and the exit-marker files stay on the asset after the task finishes (they are not removed automatically): pass cleanup=true to have this check remove them once it reports FINISHED — a FINISHED check without cleanup answers with a note saying the files are still there.",
         "operationId": "invoke_jmsx_bg_check",
         "requestBody": {
           "content": {
@@ -3991,7 +4035,7 @@
     },
     "/api/v1/tools/jmsx_put_dir/invoke": {
       "post": {
-        "description": "[risk: destructive] Upload a whole LOCAL directory to an asset through the bastion, as one tar stream on the recorded session's channel. Use it to deploy a config tree, a script bundle or a small application directory in one call instead of one jmsx_put_file per file. The semantics are MERGE, not mirror: the archive extracts into the destination, overwriting same-name files and leaving everything the host already had alone — to make the remote tree exactly the local one, clear the destination first (jmsx_exec) and then upload. Requires the connection-token path and tar on the asset; the koko terminal backend answers honestly that it cannot stream a binary payload.（需确认：set confirm=true to write files on the machine）",
+        "description": "[risk: destructive] Upload a whole LOCAL directory to an asset through the bastion, as one tar stream on the recorded session's channel. Use it to deploy a config tree, a script bundle or a small application directory in one call instead of one jmsx_put_file per file. The semantics are MERGE, not mirror: the archive extracts into the destination, overwriting same-name files and leaving everything the host already had alone — to make the remote tree exactly the local one, clear the destination first (jmsx_exec) and then upload. With dry_run=true it rehearses instead: the answer's files/bytes/skipped come from a LOCAL prescan, so deciding to shard a too-large tree or clean skipped entries costs no session at all. Requires the connection-token path and tar on the asset; the koko terminal backend answers honestly that it cannot stream a binary payload.（需确认：set confirm=true to write files on the machine）",
         "operationId": "invoke_jmsx_put_dir",
         "requestBody": {
           "content": {
