@@ -313,7 +313,7 @@ func registerGetDirTool(r *reg.Registry, cfg config.Config) {
 		Asset      string `json:"asset" jsonschema:"asset name or address"`
 		RemotePath string `json:"remote_path" jsonschema:"directory on the asset to download"`
 		LocalPath  string `json:"local_path" jsonschema:"destination directory on this machine; created if missing"`
-		Timeout    int    `json:"timeout,omitempty" jsonschema:"seconds per internal step (default 300)"`
+		Timeout    int    `json:"timeout,omitempty" jsonschema:"seconds per internal step (default 300); the stream deadline is scaled up from this by the remote tree's du -sk size"`
 	}
 
 	reg.Add(r, &mcp.Tool{
@@ -324,6 +324,10 @@ func registerGetDirTool(r *reg.Registry, cfg config.Config) {
 			"jmsx_exec or one jmsx_get_file per file. The semantics are MERGE: same-name files are overwritten, " +
 			"everything the destination already had is untouched. Extraction is defensive: an archive entry that is " +
 			"absolute or climbs out of the destination is skipped and counted in `skipped`, never written outside. " +
+			"The stream deadline is scaled by the remote tree's measured size (du -sk), so a large tree on a slow link " +
+			"does not die on a fixed timeout; and a download that fails halfway never leaves a half-tree posing as an " +
+			"answer — a destination this call created is removed (\"partial extraction removed\"), one that already " +
+			"existed is left alone but the error says it is PARTIAL and must not be used as complete. " +
 			"Requires the connection-token path and tar on the asset.",
 		OutputSchema: render.Schema[jmsexec.GetDirResult]()}, func(ctx context.Context, _ *mcp.CallToolRequest, args getDirArgs) (*mcp.CallToolResult, any, error) {
 		if strings.TrimSpace(args.RemotePath) == "" {

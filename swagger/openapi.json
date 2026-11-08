@@ -338,7 +338,7 @@
           },
           "timeout": {
             "type": "integer",
-            "description": "seconds per internal step (default 300)"
+            "description": "seconds per internal step (default 300); the stream deadline is scaled up from this by the remote tree's du -sk size"
           }
         },
         "required": [
@@ -3799,7 +3799,7 @@
     },
     "/api/v1/tools/jmsx_get_dir/invoke": {
       "post": {
-        "description": "[risk: read] Download a whole REMOTE directory from an asset through the bastion, as one tar stream on the recorded session's channel, extracted here as it arrives — the mirror of jmsx_put_dir. Use it to pull back a config tree, a log bundle or an output directory in one call instead of hand-rolled tar|base64 over jmsx_exec or one jmsx_get_file per file. The semantics are MERGE: same-name files are overwritten, everything the destination already had is untouched. Extraction is defensive: an archive entry that is absolute or climbs out of the destination is skipped and counted in `skipped`, never written outside. Requires the connection-token path and tar on the asset.",
+        "description": "[risk: read] Download a whole REMOTE directory from an asset through the bastion, as one tar stream on the recorded session's channel, extracted here as it arrives — the mirror of jmsx_put_dir. Use it to pull back a config tree, a log bundle or an output directory in one call instead of hand-rolled tar|base64 over jmsx_exec or one jmsx_get_file per file. The semantics are MERGE: same-name files are overwritten, everything the destination already had is untouched. Extraction is defensive: an archive entry that is absolute or climbs out of the destination is skipped and counted in `skipped`, never written outside. The stream deadline is scaled by the remote tree's measured size (du -sk), so a large tree on a slow link does not die on a fixed timeout; and a download that fails halfway never leaves a half-tree posing as an answer — a destination this call created is removed (\"partial extraction removed\"), one that already existed is left alone but the error says it is PARTIAL and must not be used as complete. Requires the connection-token path and tar on the asset.",
         "operationId": "invoke_jmsx_get_dir",
         "requestBody": {
           "content": {
