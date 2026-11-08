@@ -677,6 +677,8 @@ github.com/yi-nology/jumpserver-kit v0.10.4 h1:5K6q6SLqOzw8Qux9pamO0wW1dPN0WPnDo
 github.com/yi-nology/jumpserver-kit v0.10.4/go.mod h1:WCfWw1mwFogZ3QIkIQ+tNMd9brWVAz8UUdmhWxXaWtk=
 github.com/yi-nology/jumpserver-kit v0.10.5 h1:WtHg3/cEZ0W2aqRWDev790rTP7dOaD/DAOlYHbHB3uw=
 github.com/yi-nology/jumpserver-kit v0.10.5/go.mod h1:WCfWw1mwFogZ3QIkIQ+tNMd9brWVAz8UUdmhWxXaWtk=
+github.com/yi-nology/jumpserver-kit v0.11.0 h1:ZNdbl8scETWhYNckdjnISStuLLrfdhhk7TCjafl68Ls=
+github.com/yi-nology/jumpserver-kit v0.11.0/go.mod h1:WCfWw1mwFogZ3QIkIQ+tNMd9brWVAz8UUdmhWxXaWtk=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

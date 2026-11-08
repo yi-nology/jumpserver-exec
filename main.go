@@ -44,7 +44,7 @@ package main
 //
 // ⚠️ **它必须与本仓的 tag 一致** —— `go install ...@v0.5.0` 装出来的二进制
 // 要自己说对版本；说错的话，用户看 `--version` 会以为装错了版本。
-const Version = "0.14.4"
+const Version = "0.14.5"
 
 func main() {
 	dispatch()

@@ -92,7 +92,7 @@ struct PutDirResult {
   3: optional string remote,
   /** 传了多少个文件（目录与软链不计）。 */
   4: optional i32 files,
-  /** tar 流的字节数。 */
+  /** 文件内容的字节数（不含 tar 结构与块 padding——与 jmsx_put_file 的 bytes 同义）。 */
   5: optional i64 bytes,
   /** 花了多久。 */
   6: optional double seconds,
