@@ -69,7 +69,7 @@ func TestGetDirFailureRemovesTheTreeItCreated(t *testing.T) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(root) })
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	local := filepath.Join(root, "pulled")
 
 	b := &streamDirBackend{
@@ -104,7 +104,7 @@ func TestGetDirFailureLeavesAPreExistingTreeButSaysItIsPartial(t *testing.T) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(root) })
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	local := filepath.Join(root, "pulled")
 	if err := os.MkdirAll(local, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -143,7 +143,7 @@ func TestGetDirNonZeroExitAlsoRollsBack(t *testing.T) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(root) })
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	local := filepath.Join(root, "pulled")
 
 	b := &streamDirBackend{

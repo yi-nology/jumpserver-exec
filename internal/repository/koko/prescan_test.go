@@ -23,7 +23,7 @@ func prescanFixture(t *testing.T) string {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(root) })
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
 	write := func(rel, body string) {
 		p := filepath.Join(root, rel)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -48,7 +48,7 @@ func prescanFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	t.Cleanup(func() { sock.Close() })
+	t.Cleanup(func() { _ = sock.Close() })
 	if err := syscall.Mkfifo(filepath.Join(root, "pipe"), 0o600); err != nil {
 		t.Fatalf("mkfifo: %v", err)
 	}
