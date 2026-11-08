@@ -340,3 +340,5 @@ jmsx_audit_query {"refused":true,"since":"2026-10-28"}
 - 资产引用要**精确匹配**（`node` 匹配不到 `node-071`）。
   koko 的搜索按**名称**匹配，所以优先传名称。
 - 终端窗口约 40 行，长输出会截断（这是终端路径特有的限制，令牌路径没有）。
+
+> 部署提示：经 VPN/组网链路（tailscale 等）连堡垒机时，会话开可能偶发 SSH 握手 i/o timeout——客户端已内置 15s 握手界与一次重拨（`JMS_KOKO_HANDSHAKE_TIMEOUT` / `JMS_KOKO_DIAL_RETRIES` 可调），偶发失败重试即可。

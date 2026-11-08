@@ -335,12 +335,13 @@ func registerGetDirTool(r *reg.Registry, cfg config.Config) {
 			Bytes:   jms.OptInt64(res.Bytes),
 			Seconds: jms.OptFloat64(res.Seconds),
 			Stats:   s.Stats(),
-			Note:    jms.Opt("merge semantics: same-name files were overwritten, entries this machine already had are untouched"),
-		}
-		if res.Skipped > 0 {
-			out.Skipped = jms.OptInt32(int32(res.Skipped))
-			out.Note = jms.Opt(res.Note + " | merge semantics: same-name files were overwritten, " +
-				"entries this machine already had are untouched")
+			// skipped 恒填（零也填）：与 put_dir 对齐——「远端树比到达的树
+			// 多出多少」是调用方拥有的一个事实，零是答案，缺席不是。
+			Skipped: jms.OptInt32(int32(res.Skipped)),
+			Note: jms.Opt(res.Note + " | merge semantics: same-name files were overwritten, " +
+				"entries this machine already had are untouched; truncation after the tar " +
+				"end-of-archive marker is undetectable by construction — for trees that must " +
+				"be proven, compare checksums (jmsx_exec sha256sum)"),
 		}
 		return render.Text(out)
 	})
