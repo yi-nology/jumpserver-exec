@@ -98,6 +98,13 @@ displayNames:
 - `jmsx_collect` 一次会话采集多个事实 ⇒ 返回**带标签的 map**，比 `jmsx_run` 的
   位置列表更不容易读错
 
+⚠️ **部署环境提示（VPN / 组网链路）**：会话开**偶发 i/o timeout** = SSH 握手撞上
+链路抖动（实测 tailscale 链路 1/4 的会话开在 5s 界上超时），不是堡垒机或资产坏了
+——重试同一调用即可。服务端默认已把握手界放宽到 **15s** 并带一次**握手级重拨**
+（连接从未建立、零投递，重试安全；认证拒绝是判定不是抖动，永不重试）；还撞界就调大
+`JMS_KOKO_HANDSHAKE_TIMEOUT` / 调 `JMS_KOKO_DIAL_RETRIES`（见 docs/CONFIGURATION.md §3.1）。
+**别把会话开抖动当成命令超时去调**——两者是不同的界。
+
 `jmsx_session_cost` 能实测这次开会话花了多久（`stats.walk_seconds`）——
 **现在这个数字是真量出来的**，不再是写死的估值；多机演练的 `plan` 用的就是同一份测量。
 
