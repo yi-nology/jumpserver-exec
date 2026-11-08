@@ -33,8 +33,8 @@ var Table = reg.PolicyTable{
 		Hint: "confirm=true only when one of the commands is classified DANGEROUS"},
 	"jmsx_collect_multi": {Risk: jms.Risk_write, Conditional: true,
 		Hint: "confirm=true only when one of the commands is classified DANGEROUS"},
-	"jmsx_get_file":     {Risk: jms.Risk_read},
-	"jmsx_get_dir":      {Risk: jms.Risk_read},
+	"jmsx_get_file": {Risk: jms.Risk_read},
+	"jmsx_get_dir":  {Risk: jms.Risk_read},
 	// 状态检查本身是看，但 cleanup=true 在机器上删两个文件——能删东西的
 	//「看」不是看（verifier 抓的洞：JMS_READ_ONLY=1 曾放行它，留痕记成
 	// read）。写是**条件性**的（只有 cleanup 要）⇒ 普通轮询不受影响；
