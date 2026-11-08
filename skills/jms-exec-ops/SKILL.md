@@ -57,7 +57,7 @@ displayNames:
 
 `jmsx_put_file` 和 `jmsx_relay` 是例外：前者覆盖远端文件、后者在目标机器上写文件，
 一律要 `confirm=true`。
-只读的那些工具（`jmsx_get_file` / `jmsx_reachable` / `jmsx_bg_check` /
+只读的那些工具（`jmsx_get_file` / `jmsx_reachable` /
 `jmsx_inventory` / `jmsx_session_cost` / `jmsx_audit_query`）不用。
 
 **先看再跑**：`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
@@ -177,6 +177,8 @@ jmsx_bg_start {"asset":"192.0.2.71","command":"./deploy.sh","path":"/tmp/deploy.
 
 # 轮询
 jmsx_bg_check {"asset":"192.0.2.71","path":"/tmp/deploy.log"}
+# → 跑完后垃圾还在线上；读完输出带 cleanup=true + confirm=true 一次清掉
+jmsx_bg_check {"asset":"192.0.2.71","path":"/tmp/deploy.log","cleanup":true,"confirm":true}
 # → {"state":"running"} 或 {"state":"finished","exit_code":0}
 
 # 读输出

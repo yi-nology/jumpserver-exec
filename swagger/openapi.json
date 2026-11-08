@@ -96,7 +96,11 @@
           },
           "cleanup": {
             "type": "boolean",
-            "description": "after a FINISHED check, also remove the output file and the exit marker from the asset (they can reach GBs for a verbose task). Refused while the task is still running: the files are its live output"
+            "description": "after a FINISHED check, also remove the output file and exit marker from the asset (they can reach GBs for a verbose task). Needs confirm=true (it deletes files on the machine). Refused while the task is still running: the files are its live output"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true when cleanup is true (cleanup deletes files on the machine). A plain status check does not need it"
           }
         },
         "required": [
@@ -827,6 +831,18 @@
             ]
           },
           "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
             "type": [
               "null",
               "string"
@@ -3445,7 +3461,7 @@
     },
     "/api/v1/tools/jmsx_bg_check/invoke": {
       "post": {
-        "description": "[risk: read] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file. The output and the exit-marker files stay on the asset after the task finishes (they are not removed automatically): pass cleanup=true to have this check remove them once it reports FINISHED — a FINISHED check without cleanup answers with a note saying the files are still there.",
+        "description": "[risk: write] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file. The output and the exit-marker files stay on the asset after the task finishes (they are not removed automatically): pass cleanup=true to have this check remove them once it reports FINISHED — a FINISHED check without cleanup answers with a note saying the files are still there.",
         "operationId": "invoke_jmsx_bg_check",
         "requestBody": {
           "content": {

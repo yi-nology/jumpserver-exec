@@ -179,6 +179,15 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 	}
 
 	start := time.Now()
+	// 预扫先于流。上一版在这里读流中计数 counts.bytes——写端在无缓冲管道
+	// 上阻塞在第一个条目上（RunInput 还没开始读），计数恒 ≈0 ⇒ 放大从未
+	// 生效（verifier 抓的）。底数现在来自 PrescanDir——dry_run 演练答复
+	// 的同一份预扫：一次行走，两个消费者，演练与真跑同源。
+	scan, scanErr := PrescanDir(localDir)
+	if scanErr != nil {
+		return nil, scanErr
+	}
+	streamTimeout := dirStreamTimeout(timeout, scan.Bytes)
 	pr, pw := io.Pipe()
 	counts := &dirTarCounts{}
 	// The tar writer runs beside the stream, not inside it (GoSafe: a panic
@@ -191,14 +200,12 @@ func (s *Session) PutDir(localDir, remoteDir string, timeout time.Duration) (*Di
 			logx.Error("koko dir tar walk failed", "dir", localDir, "err", err)
 		}
 	})
-	// The deadline scales with the tree: a FIXED timeout kills a large
-	// directory on a slow link mid-stream (and mid-extract). After the walk
-	// finishes, counts.bytes is the size the tree actually had; the stream
-	// gets base + bytes at a floor rate of 512 KiB/s, capped at 4x base —
-	// beyond that the caller names their own timeout (the note says so).
-	streamTimeout := dirStreamTimeout(timeout, counts.bytes)
 	code, err := s.backend.RunInput("tar -xf - -C "+shellx.Quote(remoteDir), pr, streamTimeout)
 	if err != nil {
+		// 流失败时 tar 协程多半阻塞在 pw.Write 上（RunInput 已停读）：关掉
+		// 读端，Write 以 ErrClosedPipe 返回、协程走到自己的 defer pw.Close()
+		// 退出——不关则每次失败的上传漏一个协程（verifier 抓的）。
+		_ = pr.Close()
 		return nil, err
 	}
 	if code != 0 {
@@ -507,6 +514,12 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 func (s *Session) partialTreeError(localDir, remoteDir string, existed bool, extractErr, runErr error, code int) error {
 	origin := extractErr
 	switch {
+	case origin != nil && runErr != nil:
+		// 两侧都坏了就不该只报一侧：截断落在条目中间时本地报 unexpected
+		// EOF，而远端那侧的错误（超时→maybe_sent、断链）住在错误链上——
+		// 把它抹掉等于把已知的投递状态降级成「没人说」（verifier 抓的）。
+		// errors.Join 两个都带，errors.Is 对两个都通。
+		origin = errors.Join(extractErr, runErr)
 	case origin != nil:
 		// 本地解包先坏时写侧拿到的是 closed pipe——根因是解包，报它。
 	case runErr != nil:

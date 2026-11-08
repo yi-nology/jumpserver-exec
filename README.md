@@ -132,7 +132,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | `jmsx_exec_multi` | 同一条命令跑多台机器，**带回每台的输出**（`jms_job_run` 没有 stdout）。**默认并发 4 台**。`dry_run=true` 先报「几轮、多久」 |
 | `jmsx_collect_multi` | 多台机器采**同一组事实**，返回矩阵（行=机器，列=事实） |
 | `jmsx_collect` | 一次会话采集多个事实，返回**带标签的 map** |
-| `jmsx_bg_start` / `jmsx_bg_check` | 长任务**后台化**：脱离会话跑，轮询状态与退出码 |
+| `jmsx_bg_start` / `jmsx_bg_check` | 长任务**后台化**：脱离会话跑，轮询状态与退出码；`cleanup=true`（要 `confirm=true`）在跑完后清掉输出与标记（还在跑就拒清） |
 | `jmsx_put_file` | 上传文件（base64 走同一条录像会话）；支持 `local_path` / `content` / `content_base64` |
 | `jmsx_put_dir` | 上传**整个目录**（tar 流走通道 stdin，合并语义：同名覆盖、不删远端已有条目）；要 `confirm=true` |
 | `jmsx_get_file` | 读文件；支持 `offset`/`length` 在**远端**取段 |

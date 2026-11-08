@@ -7,9 +7,32 @@
 
 ### 新增
 
+- **issue 批收编第三轮**（ee67ddf + 增量修复）：`jmsx_bg_check` 加 `cleanup=true`
+  （FINISHED 后就地清掉输出与退出标记，还在跑拒清，机器侧自证 REMOVED 才报
+  cleaned）；`jmsx_put_dir` 加 `dry_run=true`（本地预扫 files/bytes/skipped，
+  零会话成本）；`jmsx_relay_dir` note 补 bytes 语义；get_dir 流超时按远端树
+  规模放大（`du -sk` 探测）；get_dir 失败回滚半棵树；执行面专用凭据槽
+  `JUMPSERVER_EXEC_TOKEN` + doctor credential 行（#14）。
+- **`jmsx_bg_check` 的 cleanup 要 `confirm=true`**（增量）：删机器上的文件是
+  写——只读模式整个停用该工具（能删东西的工具不进只读目录），没带 confirm
+  拒这次调用（拒在开会话之前，risk/blocked 随 BgCheckResult 走）。
+
 ### 变更
 
+- **`jmsx_put_dir` 的流截止时间放大第一次真正生效**（增量）：上一版在 tar
+  协程起跑后读流中计数——写端在无缓冲管道上阻塞在第一个条目上，计数恒
+  ≈0。底数改用先行的 `PrescanDir` 预扫（与 dry_run 演练同源）。
+- **get_dir 失败报告不再吞根因**（增量）：本地解包与远端流两侧都坏时
+  `errors.Join` 两个都带上——超时（maybe_sent）与断链不再被
+  unexpected EOF 拍平掉。
+
 ### 修复
+
+- **`jmsx_bg_check` 恒报 RUNNING 的 P0**：探测命令把 `.rc` 后缀拼了两次，
+  机器上探测的是永远不存在的 `p.rc.rc` ——后台任务的状态检查从上线起就没
+  工作过（本仓与并行会话各自独立发现，ee67ddf 已修）。
+- **PutDir 流失败泄漏 tar 协程**（增量）：RunInput 失败时关读端放写端出来，
+  不再每次失败上传漏一个协程。
 
 ## [0.12.0] - 2026-11-06
 

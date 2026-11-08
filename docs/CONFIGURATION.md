@@ -435,7 +435,7 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 ├── 采集多个事实（要带标签）   → jmsx_collect  （一次会话，返回命名好的 map）
 ├── 多台机器同一条命令        → jmsx_exec_multi （带每台的输出！）
 ├── 多台机器采同一组事实      → jmsx_collect_multi （矩阵：行=机器，列=事实）
-├── 超过 10 分钟的长任务      → jmsx_bg_start + jmsx_bg_check
+├── 超过 10 分钟的长任务      → jmsx_bg_start + jmsx_bg_check（跑完 cleanup=true+confirm 清垃圾）
 ├── 输出超过 40 行            → jmsx_exec 加 full=true
 └── 传文件
     ├── 本地已有的文件        → jmsx_put_file（local_path）

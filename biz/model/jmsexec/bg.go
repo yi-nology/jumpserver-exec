@@ -157,6 +157,8 @@ type BgCheckResult struct {
 	Next     *string `thrift:"next,5,optional" json:"next,omitempty"`
 	Cleaned  *bool   `thrift:"cleaned,6,optional" json:"cleaned,omitempty"`
 	Note     *string `thrift:"note,7,optional" json:"note,omitempty"`
+	Risk     *string `thrift:"risk,8,optional" json:"risk,omitempty"`
+	Blocked  *string `thrift:"blocked,9,optional" json:"blocked,omitempty"`
 }
 
 func NewBgCheckResult() *BgCheckResult {
@@ -229,6 +231,24 @@ func (p *BgCheckResult) GetNote() (v string) {
 	return *p.Note
 }
 
+var BgCheckResult_Risk_DEFAULT string
+
+func (p *BgCheckResult) GetRisk() (v string) {
+	if !p.IsSetRisk() {
+		return BgCheckResult_Risk_DEFAULT
+	}
+	return *p.Risk
+}
+
+var BgCheckResult_Blocked_DEFAULT string
+
+func (p *BgCheckResult) GetBlocked() (v string) {
+	if !p.IsSetBlocked() {
+		return BgCheckResult_Blocked_DEFAULT
+	}
+	return *p.Blocked
+}
+
 func (p *BgCheckResult) IsSetAsset() bool {
 	return p.Asset != nil
 }
@@ -255,6 +275,14 @@ func (p *BgCheckResult) IsSetCleaned() bool {
 
 func (p *BgCheckResult) IsSetNote() bool {
 	return p.Note != nil
+}
+
+func (p *BgCheckResult) IsSetRisk() bool {
+	return p.Risk != nil
+}
+
+func (p *BgCheckResult) IsSetBlocked() bool {
+	return p.Blocked != nil
 }
 
 func (p *BgCheckResult) String() string {

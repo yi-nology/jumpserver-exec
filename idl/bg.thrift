@@ -54,4 +54,8 @@ struct BgCheckResult {
   6: optional bool cleaned,
   /** 一句话说明这次答复是什么（未清理时垃圾在哪、怎么清，在这里）。 */
   7: optional string note,
+  /** 风险分级（cleanup=true 是机器上的写：只读模式拒整个工具、没带 confirm 拒这次调用）。 */
+  8: optional string risk,
+  /** 为什么没跑（cleanup 没带 confirm 时的拒答语）。 */
+  9: optional string blocked,
 }

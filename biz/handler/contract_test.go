@@ -106,6 +106,15 @@ func TestRefusalsAndRehearsalsAnswerTheirOwnContract(t *testing.T) {
 				"command": "rm -rf /var/lib/x",
 			},
 		},
+		{
+			name: "a bg_check cleanup without its confirmation",
+			tool: "jmsx_bg_check",
+			args: map[string]any{
+				"asset":   "10.0.0.1",
+				"path":    "/tmp/job.log",
+				"cleanup": true,
+			},
+		},
 	}
 	for _, tc := range cases {
 		out := callTool(t, tc.tool, tc.args)
