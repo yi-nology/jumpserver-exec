@@ -37,6 +37,14 @@ type Config struct {
 	// to turn when an agent should look at the fleet but not touch it.
 	ReadOnly bool
 
+	// CredentialDedicated says whether the REST credential came from THIS
+	// plane's own slot (JUMPSERVER_EXEC_TOKEN) rather than the shared
+	// JUMPSERVER_TOKEN. It is what the doctor's `credential` row reports on:
+	// the difference between "this plane holds the narrow account it was
+	// given" and "this plane holds whatever the shared variable carries"
+	// (issue #14 — the structural gap is visible, not silent).
+	CredentialDedicated bool
+
 	// Audit is where the gate's trail goes.
 	Audit audit.Settings
 
@@ -73,7 +81,10 @@ type APIConfig struct {
 	// without /api/v1 (the client appends that itself).
 	BaseURL string
 
-	// Token is the JumpServer PrivateToken.
+	// Token is the PRIVATE TOKEN this plane's REST calls run on, after the
+	// credential precedence below is applied: JUMPSERVER_EXEC_TOKEN (this
+	// plane's own credential) when it is set, otherwise JUMPSERVER_TOKEN
+	// (the shared variable, which the management plane reads too).
 	//
 	// ⚠️ It is NOT a v5-only credential: v4 registers
 	// PrivateTokenAuthentication too (DRF's TokenAuthentication with
@@ -183,9 +194,29 @@ type settings struct {
 	// plane can open sessions through the koko terminal alone. What it
 	// does lose is the connection-token backend and jmsx_inventory, and
 	// the doctor says so.
-	BaseURL string        `yaml:"base_url" env:"JUMPSERVER_URL"`
-	Token   string        `yaml:"token" env:"JUMPSERVER_TOKEN"`
-	Timeout time.Duration `yaml:"timeout" env:"JUMPSERVER_TIMEOUT" default:"90s"`
+	BaseURL string `yaml:"base_url" env:"JUMPSERVER_URL"`
+	Token   string `yaml:"token" env:"JUMPSERVER_TOKEN"`
+	// ExecToken is THIS plane's own credential slot (issue #14: the
+	// execution plane and the management plane must not have to share one
+	// REST credential).
+	//
+	// ⚠️ It WINS over JUMPSERVER_TOKEN when set. The point of the separate
+	// variable is the separate VALUE: JUMPSERVER_TOKEN is the variable the
+	// management plane reads, and the usual copy-paste gives both planes
+	// the administrator's token. Mint a PrivateToken for a least-privilege
+	// account (inventories need only asset reads; sessions need the
+	// connection-token path) and point this slot at it — then a leak in
+	// this plane's code paths exposes the narrow account, not the
+	// administrator.
+	//
+	// ⚠️ What this does NOT do (the honest gap): JumpServer offers no API
+	// that scopes a token's rights — the narrow credential exists only if
+	// the operator creates the narrow account. Nothing here can mint one,
+	// and a deployment that leaves this unset keeps whatever authority the
+	// shared token carries. The doctor's `credential` row says which case
+	// a deployment is in.
+	ExecToken string        `yaml:"exec_token" env:"JUMPSERVER_EXEC_TOKEN"`
+	Timeout   time.Duration `yaml:"timeout" env:"JUMPSERVER_TIMEOUT" default:"90s"`
 
 	// The alternative credential: a login the bastion exchanges for a
 	// Bearer token. It is used only when the PrivateToken is absent, and
@@ -238,10 +269,16 @@ func Load() (Config, error) {
 
 	cfg := Config{
 		ReadOnly: s.ReadOnly,
-		Audit:    audit.Settings{Mode: s.AuditMode, Dir: s.AuditDir, RetentionDays: s.AuditRetentionDays},
+		// The credential's provenance rides beside the credential itself:
+		// the doctor reports the structural gap (shared vs dedicated) and
+		// cannot work it out from the merged value alone.
+		CredentialDedicated: strings.TrimSpace(s.ExecToken) != "",
+		Audit:               audit.Settings{Mode: s.AuditMode, Dir: s.AuditDir, RetentionDays: s.AuditRetentionDays},
 		API: APIConfig{
-			BaseURL:           strings.TrimRight(strings.TrimSpace(s.BaseURL), "/"),
-			Token:             strings.TrimSpace(s.Token),
+			BaseURL: strings.TrimRight(strings.TrimSpace(s.BaseURL), "/"),
+			// Credential precedence (issue #14): this plane's own slot
+			// wins; the shared variable is the fallback it always was.
+			Token:             execTokenOf(s),
 			Username:          strings.TrimSpace(s.Username),
 			Password:          strings.TrimSpace(s.Password),
 			OTP:               strings.TrimSpace(s.OTP),
@@ -320,6 +357,21 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// execTokenOf applies the credential precedence (issue #14): the execution
+// plane's own JUMPSERVER_EXEC_TOKEN wins when it is set; otherwise the
+// shared JUMPSERVER_TOKEN stands, exactly as before (backward compatible —
+// a deployment that never sets the new variable behaves byte for byte the
+// same).
+//
+// It is a function of its own so the precedence has one home and the doctor
+// can be pointed at the same question.
+func execTokenOf(s *settings) string {
+	if t := strings.TrimSpace(s.ExecToken); t != "" {
+		return t
+	}
+	return strings.TrimSpace(s.Token)
 }
 
 // delegationOf attaches the delegation credential, when there is one.

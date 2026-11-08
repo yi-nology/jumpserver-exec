@@ -162,6 +162,7 @@ jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 |---|---|---|---|
 | `JUMPSERVER_URL` | 否 | **无** | 堡垒机地址，不要带尾部斜杠（代码会 `TrimRight`），也不带 `/api/v1`。⚠️ **执行面不强制**：缺了连接令牌那条路就没有（只走 koko 终端），资产清单工具也停用 |
 | `JUMPSERVER_TOKEN` | 否 | 无 | JumpServer **PrivateToken**，呈现为 `Authorization: Token <key>`。⚠️ **不是 v5 专有**：v4 也注册了 `PrivateTokenAuthentication`。缺失时**执行面不启动失败**（它可以只走 koko），但资产清单与令牌后端都停用 |
+| `JUMPSERVER_EXEC_TOKEN` | 否 | 无 | **执行面自己的凭据槽**（最小权限，见 §3.2.1）：设了就**赢过** `JUMPSERVER_TOKEN`。语义与 `JUMPSERVER_TOKEN` 完全相同（PrivateToken 头）——差别只在它是**这个面的**凭据，不该与管理面共用一枚 |
 | `JUMPSERVER_USERNAME` | 否 | 无 | 另一种凭据：**用账号密码登录**，堡垒机换成 Bearer token（`POST /api/v1/authentication/auth/`） |
 | `JUMPSERVER_PASSWORD` | 跟 `JUMPSERVER_USERNAME` 配 | 无 | 上面那个登录的密码。⚠️ **优先读文件**（`~/.config/jumpserver-mgmt/password`，0600），环境变量是退路 —— 长跑进程的环境在 Linux 上是 `/proc` 里谁都能读的 |
 | `JUMPSERVER_OTP` | 否 | 无 | base32 的 TOTP 密钥。**只在堡垒机要求二次验证时用得上** |
@@ -174,7 +175,43 @@ jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 | `JMS_AUDIT_DIR` | 否 | `~/.local/state/jumpserver-mgmt/audit` | 留痕文件放哪（目录 0700、文件 0600）。两个服务写同一个目录 |
 | `JMS_AUDIT_RETENTION_DAYS` | 否 | `7` | 留痕文件保留多少天。**0 或负数 = 不按时间清**（⚠️ 但**空文件**那条规则照样删：安静超过一小时的空文件与保留期无关）。⚠️ 保留期是**文件级**的：超过保留期**且进程已结束**的文件会被清理；正在运行的进程的文件不删 ⇒ 文件里的行可能比这个窗口更老 |
 
-⚠️ **两种凭据都配了怎么办**：`JUMPSERVER_TOKEN` 赢 —— 它不过期，登录换来的 Bearer token 会过期。
+⚠️ **两种凭据都配了怎么办**：`JUMPSERVER_TOKEN` 赢 —— 它不过期，登录换来的 Bearer token 会过期。⚠️ **三种都看**（token / exec_token / 登录）：`JUMPSERVER_EXEC_TOKEN` 优先于 `JUMPSERVER_TOKEN`，登录凭据仍然只在**没有任何 token** 时才用。
+
+#### 3.2.1 执行面的最小权限（gap 声明，诚实版）
+
+**结构性缺口**（issue #14）：执行面与管理面历史上共用同一枚 REST 凭据——通常
+是管理员的 PrivateToken。`JUMPSERVER_TOKEN` 是**同一个变量名**，两个 env 文件
+各配一份，复制粘贴的自然结果就是同一个值 ⇒ 执行面的 `jmsx_inventory`、连接
+令牌签发，与管理面的写操作权限面完全相同。`JMS_READ_ONLY=1` 只挡工具层，挡
+不住「token 本身是管理员」这件事。
+
+**这个仓能做的**（本次已做）：
+
+- **凭据分离配置位**：`JUMPSERVER_EXEC_TOKEN`——执行面专用的凭据变量。设了
+  它，执行面就不再读管理面那个变量；两枚凭据从此**可以**不同值，复制粘贴的
+  陷阱没有了。
+- **doctor 的 `credential` 行**：报告执行面现在用的是专用凭据还是共享变量。
+  用共享变量时是 WARN，并写明最小权限指引。
+
+**运维要做的**（代码替代不了）：
+
+1. 在 JumpServer 里为执行面**单独建一个账户**，权限收敛到：资产**只读**
+   （清单用）+ 允许开连接令牌/会话（执行用）。JumpServer 没有「给一枚 token
+   圈定权限范围」的 API——窄凭据只能靠窄账户，这是本次核查（kit 的
+   `pkg/jmsapi/capability.go`：v4/v5 的差异清单里唯一细粒度凭据机制是 Chat AI
+   委派）得出的结论，不虚构 API。
+2. 给该账户签 PrivateToken，填进执行面 env 的 `JUMPSERVER_EXEC_TOKEN`。
+3. 管理面保留 Administrator，`JUMPSERVER_TOKEN` 不动。
+
+**残余风险（诚实声明）**：
+
+- 不设 `JUMPSERVER_EXEC_TOKEN` ⇒ 执行面保持现状（共享变量的权限面）——doctor
+  会 WARN，但不强制。
+- 会话的**机器侧**身份（登录到资产的那个账号）由 `JMS_KOKO_USER` / 资产授权
+  决定，与 REST 凭据分离是另一件事；本节只收窄 **REST 面**。
+- v5 且配了 `JMS_DELEGATION_SECRET` 时，**连接令牌**已经以被委派用户身份签发
+  （见 §3.3）——委派收窄的是会话授权，不是 REST 调用（清单/令牌端点仍以
+  token 所有者身份跑）。两层各自收窄，互不替代。
 
 ### 3.3 可选：Chat AI 委派凭据
 

@@ -193,3 +193,37 @@ func TestTheDoctorSaysWhenTheTrailDirectoryIsNotOne(t *testing.T) {
 		t.Errorf("an unset trail directory reported %q, want warn", status)
 	}
 }
+
+// The credential row answers "whose token does this plane hold" — the one
+// fact the rest_client row cannot say (issue #14). The warning names the
+// variable, not the rights: the code can see which slot a value came from,
+// never what the bastion grants it.
+func TestTheCredentialRowSaysWhoseTokenIsInUse(t *testing.T) {
+	dedicated := credentialCheck(true)
+	if dedicated.Status != "ok" {
+		t.Errorf("a dedicated credential reported %q, want ok", dedicated.Status)
+	}
+	if !strings.Contains(dedicated.Detail, "JUMPSERVER_EXEC_TOKEN") {
+		t.Errorf("the dedicated row does not name the slot: %s", dedicated.Detail)
+	}
+
+	shared := credentialCheck(false)
+	if shared.Status != "warn" {
+		t.Errorf("the shared variable reported %q, want warn", shared.Status)
+	}
+	for _, want := range []string{
+		"JUMPSERVER_TOKEN",
+		"SAME VARIABLE the management plane",
+		"JUMPSERVER_EXEC_TOKEN",
+		"Least privilege",
+	} {
+		if !strings.Contains(shared.Detail, want) {
+			t.Errorf("the shared-variable row lost %q:\n%s", want, shared.Detail)
+		}
+	}
+	// Honest about the boundary: the row says the sharing is conditional on
+	// the two files carrying the same value — it cannot see the rights.
+	if !strings.Contains(shared.Detail, "if the two env files carry the same value") {
+		t.Errorf("the row asserts a fact it cannot see:\n%s", shared.Detail)
+	}
+}

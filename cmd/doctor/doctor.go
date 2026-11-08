@@ -227,6 +227,17 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		report("ok", "rest_client", "the bastion API answered")
 	}
 
+	// WHICH credential the plane runs on — dedicated or shared (issue #14).
+	// The rest_client row above answers "is there a credential"; this row
+	// answers "whose is it", because the two planes reading one variable is
+	// the structural gap: the usual copy-paste gives this plane the
+	// management plane's administrator token. A function of its own so a
+	// test can drive it without a bastion.
+	if api != nil {
+		ck := credentialCheck(cfg.CredentialDedicated)
+		report(ck.Status, ck.Name, ck.Detail)
+	}
+
 	// What is known about the delegation scheme, asked ONCE.
 	//
 	// ⚠️ It is asked once because two rows below need it (the version row
@@ -429,6 +440,32 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return cli.ExitOK
 	}
 	return cli.ExitError
+}
+
+// credentialCheck says whose credential the plane's REST calls run on.
+//
+// It is a function of its own so that a test can drive it WITHOUT the
+// bastion: this check is about THIS installation's configuration, and a
+// check nobody can exercise is a check that quietly stops checking.
+//
+// ⚠️ The warning is honest about what the code can and cannot know: it can
+// see WHICH VARIABLE the credential came from, not the rights the bastion
+// grants it — so the sentence says "the variable is the shared one", and
+// names the consequence conditionally ("if the two env files carry the same
+// value, as the usual copy-paste does"), never as an asserted fact.
+func credentialCheck(dedicated bool) doctorCheck {
+	if dedicated {
+		return doctorCheck{Status: "ok", Name: "credential",
+			Detail: "this plane runs on its own credential (JUMPSERVER_EXEC_TOKEN); the management plane's " +
+				"JUMPSERVER_TOKEN is not in use here"}
+	}
+	return doctorCheck{Status: "warn", Name: "credential",
+		Detail: "no dedicated credential: the REST calls run on JUMPSERVER_TOKEN, the SAME VARIABLE the management " +
+			"plane reads — if the two env files carry the same value (the usual copy-paste), every tool on this plane " +
+			"holds the management plane's authority, typically an administrator's. Least privilege: create an account " +
+			"whose rights cover asset reads and the connection-token path, and set JUMPSERVER_EXEC_TOKEN to its token " +
+			"(the delegation secret, when configured, already narrows the SESSIONS' authority; it does not narrow the " +
+			"REST calls')"}
 }
 
 // bastionCheck says whether the koko side is configured well enough to open
