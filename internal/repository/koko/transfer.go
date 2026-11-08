@@ -20,6 +20,7 @@ package koko
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -30,6 +31,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -365,29 +367,64 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 	// 不抽干的话写侧会永远阻塞在管道上（无缓冲），谁也别想收尾。
 	pr, pw := io.Pipe()
 	counts := &dirTarCounts{}
+	// 流尾（tar 终止块之后的残余字节）单收一份：流尾标记在这里。
+	// 有界——标记紧跟归档，64KB 是几百倍的余量；其余字节照旧抽干，
+	// 写侧才收得了场。
+	tail := &bytes.Buffer{}
 	extractDone := make(chan error, 1)
 	async.GoSafeLabeled("koko-dir-untar", func() {
 		err := readDirTar(pr, localDir, counts)
-		_, _ = io.Copy(io.Discard, pr) // 出错也要把写侧放出来
+		if err == nil {
+			_, _ = io.CopyN(tail, pr, markerScanLimit)
+		}
+		_, _ = io.Copy(io.Discard, pr) // 余量照旧抽干（出错也要把写侧放出来）
 		extractDone <- err
 	})
-	code, runErr := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null", pw, timeout)
+	// 远端命令带**流尾标记**（GitHub #16）：tar 流本身有终止块，但「恰好
+	// 以完整归档结尾的截断」extractor 无法分辨，exit code 是唯一证据——
+	// 而复合命令的退出码属于最后一个命令，不再是 tar 的。所以：
+	//   rc=$? 把 tar 的退出码留下，echo __JMSX_DONE_$rc 让它**随流携带**
+	//   （标记缺失 = 流被截断，extractor 报错），exit $rc 又把它放回通道
+	//   退出码（旧远端吞掉标记时，退回原判据，向后兼容）。
+	code, runErr := s.backend.RunOutput("tar -cf - -C "+shellx.Quote(remoteDir)+" . 2>/dev/null; rc=$?; echo "+dirEndMarkerPrefix+"$rc; exit $rc", pw, timeout)
 	_ = pw.Close() // 流到此为止：extractor 的 Read 收到 EOF，开始收尾
 	extractErr := <-extractDone
 	if extractErr != nil {
 		// 本地解包先坏时写侧拿到的是 closed pipe——根因是解包，报它。
+		// 这也是归档中段被截断的显式报错：tar.Reader 读不到完整条目。
 		return nil, extractErr
 	}
 	if runErr != nil {
 		return nil, runErr
 	}
-	if code != 0 {
+	markerCode, markerSeen, markerErr := parseStreamEndMarker(tail.String())
+	if markerErr != nil {
+		return nil, markerErr
+	}
+	// 退出码的归属（GitHub #16）：标记在，以标记为准——非零 = tar 自己
+	// 失败了，树可能不完整，显式报错而不是交回半个树；标记缺（旧远端 /
+	// 标记被吞），降级为原行为：信通道退出码（exit $rc 保证了它仍等于
+	// tar 的码），note 打 warning 说明这条边界。
+	if markerSeen {
+		if markerCode != 0 {
+			return nil, fmt.Errorf("tar -cf - -C %s on %s exited %d — the tree may be incomplete", remoteDir, s.asset, markerCode)
+		}
+	} else if code != 0 {
 		return nil, fmt.Errorf("tar -cf - -C %s exited %d on %s", remoteDir, code, s.asset)
 	}
 	note := ""
+	if !markerSeen {
+		note = "the stream carried no end-of-archive marker (a legacy remote): the session's exit code was trusted, " +
+			"and a truncation right after the tar end-of-archive would be undetectable"
+	}
 	if counts.skipped > 0 {
-		note = fmt.Sprintf("%d entr%s skipped while extracting (outside the destination, or not a file/dir/symlink): %s",
+		skip := fmt.Sprintf("%d entr%s skipped while extracting (outside the destination, or not a file/dir/symlink): %s",
 			counts.skipped, ifPlural(counts.skipped), strings.Join(counts.skippedNames, ", "))
+		if note != "" {
+			note = skip + "; " + note
+		} else {
+			note = skip
+		}
 	}
 	return &DirTransferResult{
 		Asset:     s.asset,
@@ -399,6 +436,47 @@ func (s *Session) GetDir(remoteDir, localDir string, timeout time.Duration) (*Di
 		Skipped:   counts.skipped,
 		Note:      note,
 	}, nil
+}
+
+// dirEndMarkerPrefix is the end-of-stream marker a get_dir remote command
+// appends after its archive: `echo __JMSX_DONE_$rc`. The tar format has an
+// end-of-archive marker of its own, but a stream that is cut off right
+// after it is indistinguishable from a complete one — the extractor cannot
+// tell "the archive ended" from "the transport did" without something the
+// REMOTE writes last. The marker is that something: seeing it proves the
+// stream ran to the end of the remote command, and it carries tar's own
+// exit code, which the compound command's exit status no longer does.
+//
+// Backward compatibility: a remote that swallows the marker (an older
+// wrapper in front of the shell, a transport that trims trailing lines)
+// degrades to the old discipline — the channel's exit code, which
+// `exit $rc` keeps equal to tar's — with a warning in the note.
+const dirEndMarkerPrefix = "__JMSX_DONE_"
+
+// markerScanLimit bounds how much post-archive stream is kept for the
+// marker scan: the marker is the remote command's next output after the
+// archive, so this is generous. Everything after it is drained, not kept
+// — an unbounded tail would let a noisy remote fill this process's memory.
+const markerScanLimit = 64 * 1024
+
+// parseStreamEndMarker scans the post-archive tail for the marker line and
+// returns the exit code it carries, whether a marker was seen at all, and
+// an error when a marker-shaped line carried no parseable code (a stream
+// that was mangled this way is not trusted with a silent pass).
+func parseStreamEndMarker(tail string) (code int, seen bool, err error) {
+	for _, line := range strings.Split(tail, "\n") {
+		line = strings.TrimSpace(line)
+		rest, ok := strings.CutPrefix(line, dirEndMarkerPrefix)
+		if !ok {
+			continue
+		}
+		n, perr := strconv.Atoi(rest)
+		if perr != nil {
+			return 0, true, fmt.Errorf("the stream's end marker carried no exit code (%q)", line)
+		}
+		return n, true, nil
+	}
+	return 0, false, nil
 }
 
 // readDirTar extracts a tar stream into root as it arrives, counting what

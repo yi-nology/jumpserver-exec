@@ -112,6 +112,9 @@ struct PutDirResult {
  * 一次目录下载的结果（jmsx_get_dir）。
  *
  * 与 jmsx_put_dir 对称：远端 tar -cf - 的 stdout 走通道回来，本地边收边解。
+ * 流完整性：远端命令在归档后追加流尾标记（__JMSX_DONE_$rc），标记在
+ * = 流真跑到头（tar 自己的退出码随标记携带）；标记缺 = 截断显式报错，
+ * 旧远端降级为通道退出码 + note 提示边界。
  * 合并语义：同名文件被覆盖，本地已有但远端没有的条目原样保留。
  * 防御式解包：绝对路径 / 穿越目的地的条目被跳过并计数（skipped），
  * 不会写到 local 之外。
@@ -133,7 +136,7 @@ struct GetDirResult {
   7: optional i32 skipped,
   /** 这个会话的账。 */
   8: optional session.SessionStats stats,
-  /** 一句话说明这次答复是什么（跳过清单在这里）。 */
+  /** 一句话说明这次答复是什么（跳过清单与「流无标记」的截断边界提示在这里）。 */
   9: optional string note,
 }
 
