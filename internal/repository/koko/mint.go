@@ -462,13 +462,19 @@ func dialKoko(ctx context.Context, cfg Config, tok connectionToken, timeout time
 	return client, nil
 }
 
-// isHandshakeFailure says whether a dial error happened BEFORE anything was
-// delivered: the TCP connect or the SSH handshake died. A failure after the
-// handshake (auth rejected, channel open refused) is a verdict about the
-// credential or the deployment — retrying those would hide real errors.
+// isHandshakeFailure says whether a dial error is a HANDSHAKE TIMEOUT: the
+// peer accepted the connection but never spoke SSH — a link blip, safe to
+// redial (nothing was ever delivered, so the never-replay rule does not
+// apply to a dial that delivered nothing). The typed sentinel (network#116,
+// absorbed this round) is the judgement, not the wording: the previous
+// string matcher (`Contains("handshake")`) matched the REJECTION text too
+// ("the SSH handshake with %s failed: unable to authenticate"), so an auth
+// refusal has been silently redialled since this retry shipped — redialling
+// wrong credentials and burying the verdict (AGENTS §5 said no-retry; the
+// wording said retry). A rejection is a verdict about the credential, and
+// stays un-retried (ErrHandshakeRejected fails this check).
 func isHandshakeFailure(err error) bool {
-	msg := err.Error()
-	return strings.Contains(msg, "handshake") || strings.Contains(msg, "did not finish within")
+	return errors.Is(err, sshx.ErrHandshakeTimeout)
 }
 
 // Exec runs one command on the asset.
