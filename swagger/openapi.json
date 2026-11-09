@@ -3318,7 +3318,7 @@
   "info": {
     "description": "自动生成（`tools openapi`），与 MCP 工具目录同源：入参/出参形状取自注册表装配时捕获的 schema（出参来自 idl/ 契约的生成物）。所有工具调用与 stdio 共用同一道风险门禁、确认语义与留痕。拒绝与失败的调用返回 HTTP 200 + is_error=true（请求没错，结果是拒绝）。",
     "title": "jumpserver-exec HTTP API",
-    "version": "0.15.2"
+    "version": "0.15.3"
   },
   "openapi": "3.1.0",
   "paths": {
