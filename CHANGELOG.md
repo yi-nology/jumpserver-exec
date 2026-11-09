@@ -5,25 +5,6 @@
 
 ## [Unreleased]
 
-## [0.14.8] - 2026-11-09
-
-### 新增
-
-- put_dir dry_run 预演：本地 PrescanDir 预扫 files/bytes/skipped，零会话成本（#20）
-- 执行面专用凭据位 JUMPSERVER_EXEC_TOKEN（优先于共享 token）+ doctor credential 行与最小权限指引——#14 的部分缓解，结构性缺口与运维三步见 docs/CONFIGURATION.md §3.2.1（#14）
-
-### 修复
-
-- bg_check 文件清理：FINISHED 同回合 cat rc 后 rm log/rc，RUNNING 拒绝并说明；顺修 .rc.rc 双后缀判定虫（bg_check 曾永远答 RUNNING）（#19）
-- get_dir 超时按远端树规模放大（du -sk 探测，512KiB/s 地板+4x 帽）+ 解包失败回滚半成品（#22）
-- relay_dir note 补 bytes 语义：小树 tar+512B padding 占比天然高（#21）
-
-### 变更
-
-### 新增
-
-### 修复
-
 ## [0.15.0] - 2026-11-09
 ### 新增
 - **issue 批收编第三轮**（ee67ddf + 增量修复）：`jmsx_bg_check` 加 `cleanup=true`
