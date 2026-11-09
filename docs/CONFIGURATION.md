@@ -477,6 +477,7 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 | `Permission denied (password,publickey)` | `--doctor` 的 `key_type` | ed25519 密钥，koko 只认 RSA |
 | 登录报「没有可用的授权账号或终端协议」 | 管理面的 `jms_doctor` | 资产没 protocols / 没账号 / 授权的 accounts 是空列表 |
 | 每次会话都慢十倍 | `--doctor` 的 `version` | 委派在 v4 上回 401 ⇒ 被读成「令牌机制不可用」 |
+| env 值带首尾空白 | 直接可用 | confload 统一裁掉（Token 尾随空格不再漏进 Authorization 头，枚举字段带空白不再拒载） |
 | `jmsx_exec` 返回空 | 看 `exit_code` 和 `truncated` | `exit_code=-1` = 未知（命令杀了 shell），改用 `sh -c '...'` 包一层；`truncated=true` = 开头被截掉了 |
 | `jmsx_inventory` 不见了 | 有没有 `JUMPSERVER_TOKEN` | 没 REST 凭据时**它不注册** ⇒ 工具数是 14 不是 15 |
 | 输出少了 40 行 | 走的是哪条路 | **终端兜底路径**的窗格只有约 40 行；令牌路径是完整的 |

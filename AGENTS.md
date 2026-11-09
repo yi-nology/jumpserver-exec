@@ -411,6 +411,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | `-mod may only be set to readonly or vendor` | 模块模式只接受 readonly/vendor | 去掉这个 flag（构建脚本已去掉） |
 | 源码树里冒出 `.go.1234567890` 之类文件 | 编辑器/工具留下的备份 | 清理掉，别提交 |
 | **每次会话都慢十倍** | 委派在 v4 上回 401 ⇒ 被读成「令牌机制不可用」 | 关掉委派（能力档在 v4 上不发起委派） |
+| **env 值带首尾空白** | confload 统一裁掉（两面一致；升级前旧版 core 裁、v0.13.5 起不裁——本仓契约是裁） | 无需处理；口令真要含首尾空格的场景本仓没有承载路径 |
 | **会话开偶发 i/o timeout（VPN/组网链路）** | SSH 握手撞上链路抖动（实测 tailscale 链路 1/4 会话开在 5s 内超时） | 已内置：握手界 15s + 握手级失败重拨一次（`JMS_KOKO_HANDSHAKE_TIMEOUT` / `JMS_KOKO_DIAL_RETRIES` 可调）；认证拒绝不重试（那是判定不是抖动） |
 | **底座改了编译不过** | `require` 指向的 kit 版本还没发 | 先发 kit 的 tag，再更新本仓的 require |
 
