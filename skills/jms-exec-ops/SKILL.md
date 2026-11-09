@@ -2,13 +2,14 @@
 name: jms-exec-ops
 description: |
   Run commands and move files on machines through the JumpServer bastion. Use when a
-  request involves 在某台机器上执行命令 / 批量下发命令到多台 / 查磁盘内存日志 / 传文件 /
-  下载文件 / 跑长任务 / 部署脚本 / 查本机执行留痕（谁试过什么、被谁拦下）, or when a jmsx_*
+  request involves 在某台机器上执行命令 / 批量下发命令到多台 / 查磁盘内存日志 / 健康巡检 /
+  机器负载 / 网络连通性排障 / 传文件 / 下载文件 / 跑长任务 / 部署脚本 / 查本机执行留痕（谁试过什么、被谁拦下）, or when a jmsx_*
   tool is available. Covers session
   cost, parallel fan-out, detached long jobs, the ~40-row output ceiling and how to get
-  past it, and the koko TUI protocol's current quirks.
+  past it, and the koko TUI protocol's current quirks. Two ready recipes: fleet health
+  check and machine-vantage connectivity troubleshooting.
 descriptions:
-  zh-Hans: "通过堡垒机在受管机器上执行命令与传文件：单条/多条/多台并发/长任务后台、文件上传下载取段、大输出截断处理、本机执行留痕查询。涉及连机器执行命令、批量下发、查磁盘日志、传文件、部署、查「谁试过什么被拦下了」时使用。"
+  zh-Hans: "通过堡垒机在受管机器上执行命令与传文件：单条/多条/多台并发/长任务后台、文件上传下载取段、大输出截断处理、本机执行留痕查询。涉及连机器执行命令、批量下发、查磁盘日志、传文件、部署、健康巡检、查机器负载、连通性排障、查「谁试过什么被拦下了」时使用。"
 displayNames:
   zh-Hans: "堡垒机执行面"
 ---
@@ -36,6 +37,7 @@ displayNames:
 | **一台机器的文件直接传到另一台** | `jmsx_relay`（字节不经过本机） |
 | **一个目录从一台机器推到另一台** | `jmsx_relay_dir`（tar 管道对拷，不落本机） |
 | 能不能连上 | `jmsx_reachable` |
+| **机器到它的依赖通不通**（应用排障） | 暂无工具，用连通性排障配方：[`references/connectivity.md`](references/connectivity.md) |
 | 想知道连接池里现在有什么 | `jmsx_pool_status` |
 | 想先算一次会话划不划算 | `jmsx_session_cost` |
 | 不知道资产叫什么 | `jmsx_inventory` |
@@ -133,6 +135,9 @@ jmsx_collect_multi {"assets":["node-031","rpi4-011","dnsbox1"],
 每台机器**一条会话**（所以一台的事实不会串到另一台），机器之间并发。
 
 这是 fleet 运维的主力场景：同一组问题问遍所有机器，答案要能并排看。
+
+**标准巡检配方**（负载/内存/磁盘/TCP/进程的检查集、判读阈值、CLOSE-WAIT 应用 bug 信号）：
+[`references/health-check.md`](references/health-check.md) —— 每条命令实测免确认，照抄即可。
 
 ### 大范围采集：先演练，问清楚「几轮、多久」
 

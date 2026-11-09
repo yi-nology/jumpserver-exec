@@ -9,14 +9,16 @@ skills/
 └── jms-exec-ops/             ← 在机器上跑命令、批量并发、长任务、传文件、大输出
     ├── SKILL.md
     └── references/
-        └── koko-tui.md        ← koko TUI 协议（2026-10-25 实测）
+        ├── koko-tui.md        ← koko TUI 协议（2026-10-25 实测）
+        ├── health-check.md    ← 健康巡检配方（检查集+阈值，2026-11-10 分类实测）
+        └── connectivity.md    ← 连通性排障配方（探测梯子+失败分类，2026-11-10 分类实测）
 ```
 
 ## 这个 skill 干什么
 
 | skill | 什么时候加载 | 写操作? |
 |---|---|---|
-| `jms-exec-ops` | 在机器上跑命令、批量扫、传文件、传大输出、跑长任务 | 远端是 |
+| `jms-exec-ops` | 在机器上跑命令、批量扫、传文件、传大输出、跑长任务、健康巡检与连通性排障配方 | 远端是 |
 
 ⚠️ **管理面的 skill 在另一个仓**：入口 skill `jumpserver-ops`、资产上线 `jms-onboarding`、
 权限核查 `jms-access-review` 在
