@@ -68,6 +68,9 @@ jmsx_collect_multi {"assets":[...],"checks":[<标准检查集>]}
 - 多机时每台**一条会话**；大范围先 `dry_run=true` 看 plan（几轮/秒数）再跑。
   ⚠️ 单机成本随链路差很大：快链路实测 2~3s/台，**VPN 链路实测 45s/台**（2026-11-10，
   bridge-home：握手 12.9s + 7 条命令 ≈32s）—— plan 的底数是**实测中位数**，以它为准。
+  ⚠️ **新进程没量过底数时 plan 会严重低估**（2026-11-10 fleet 实测：8 台并发 4，
+  plan 报 33s，真跑 **419s**）—— 先看 `walk_source`/`command_source`：写着
+  `default: this process has not measured` 的估算只能当数量级参考。
 - 某台 `error` ≠ 采到空数据：连接失败、超时各自有 error 文本 —— 判读时按台看，别把失败并进对比。
 - 答复的 `via` 显示**没走 connection token**（终端兜底路径）时，输出受约 40 行窗格限制
   （读法见 SKILL.md 第 5 节）—— 本配方每条 check 的输出都设计得短（≤10 行），正常装得下；
