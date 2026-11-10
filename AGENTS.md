@@ -381,7 +381,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
 | 竞态 | 池的并发护栏在 `internal/repository/koko/pool_test.go` ⇒ **必须带 `-race` 跑** |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
-| 工具数 | **15**（无 REST 凭据时 **14**）—— `internal/service/policy/policy_test.go` 钉住这个**集合** |
+| 工具数 | **18**（无 REST 凭据时 **17**）—— `internal/service/policy/policy_test.go` 钉住这个**集合**（§3.1 同口径） |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |
