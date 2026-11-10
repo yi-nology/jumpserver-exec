@@ -66,6 +66,9 @@ displayNames:
 ## 维护
 
 改完执行面的 MCP 工具后，**这个 skill 的工具表要一起改**。
+⚠️ **`~/.minimax/mcp.json` 里 jms-exec 那条的 `description` 也是一张工具清单**
+（部署侧手写字段，仓里没有源头）—— 加/删/改工具时**手动同步**它，否则 agent 看到的
+server 描述就少工具、漏能力。
 
 这不靠自觉 —— 管理面仓的 `script/check-skill-drift.sh` 会扫描**工作集**
 （两个仓的技能一起看，因为执行面的 skill 会提到管理面的工具）：
