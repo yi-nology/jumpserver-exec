@@ -52,10 +52,10 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		if riskClass, would, blocked := rehearsal(cmdClass, args.Confirm); !would {
 			return render.Text(blockedCommand(args.Asset, args.Command, riskClass, blocked))
 		}
+		// The 600s ceiling (and the overflow it used to miss) lives in
+		// commandTimeout now (#27): this used to clamp `timeout > 600s`
+		// AFTER the multiplication, which a wrapped-negative sailed past.
 		timeout := commandTimeout(args.Timeout, 60)
-		if timeout > 600*time.Second {
-			timeout = 600 * time.Second
-		}
 
 		k, err := koko.Open(ctx, cfg.Koko, args.Asset, "", timeout+90*time.Second)
 		if err != nil {

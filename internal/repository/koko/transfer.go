@@ -878,18 +878,53 @@ func (s *Session) verifyUpload(remotePath string, data []byte, timeout time.Dura
 //
 // It is the path for a backend that types into a screen: the payload has to
 // survive a line of text, and the pane only keeps about forty rows.
+//
+// It keeps the three promises the tool description makes (the same ones the
+// channel path keeps, and the same shapes — measured 2026-11-10, #26: this
+// path used to delete the destination up front and decode straight into it,
+// so a failed transfer left a HOLE where the old file was, and a symlinked
+// destination became a plain file while the release it pointed at kept its
+// old content):
+//
+//   - the destination is resolved first, so a symlink keeps its link;
+//   - the payload lands on a sibling temp name and is RENAMED into place
+//     (atomic: same directory, same filesystem), so a transfer that fails
+//     halfway leaves the file that was there before untouched;
+//   - nothing deletes the destination — the only `rm -f`s aim at the
+//     transfer's own artefacts.
 func (s *Session) putBytesOverBase64(data []byte, remotePath string, timeout time.Duration) (*TransferResult, error) {
 	start := time.Now()
-	tmp := fmt.Sprintf("/tmp/.jmsx-%s-%d.b64", s.assetTag(), start.UnixNano())
-	// Every path below is interpolated into a shell command line, so every one
-	// of them is quoted. The temp path is generated here and cannot contain
-	// metacharacters, but it is quoted too so the rule has no exceptions.
 	qRemote := shellx.Quote(remotePath)
-	qTmp := shellx.Quote(tmp)
 
-	// Start from a clean slate; a stale temp file from an interrupted transfer
-	// would otherwise be appended to and silently corrupt the result.
-	if _, _, _, err := s.Run(fmt.Sprintf("rm -f %s %s", qTmp, qRemote), timeout); err != nil {
+	// Where the file really lives. A symlink's target, or the path itself —
+	// the same probe the channel path runs.
+	target, _, _, err := s.Run(fmt.Sprintf("readlink -f %s 2>/dev/null || echo %s", qRemote, qRemote), timeout)
+	if err != nil {
+		return nil, err
+	}
+	target = strings.TrimSpace(target)
+	if target == "" {
+		target = remotePath
+	}
+	qTarget := shellx.Quote(target)
+
+	// The staging file is the base64 RAW MATERIAL: it lives in /tmp, and it
+	// is the only thing a stale leftover could corrupt. The decoded payload
+	// goes to a sibling of the target (same naming the channel path uses),
+	// so the final `mv` is a same-directory rename.
+	tmp := fmt.Sprintf("/tmp/.jmsx-%s-%d.b64", s.assetTag(), start.UnixNano())
+	staged := fmt.Sprintf("%s.jmsx-tmp-%s", target, stringx.GenerateID())
+	// Every path below is interpolated into a shell command line, so every one
+	// of them is quoted. The temp paths are generated here and cannot contain
+	// metacharacters, but they are quoted too so the rule has no exceptions.
+	qTmp := shellx.Quote(tmp)
+	qStaged := shellx.Quote(staged)
+
+	// Start the staging file from a clean slate; a stale temp file from an
+	// interrupted transfer would otherwise be appended to and silently
+	// corrupt the result. The DESTINATION is deliberately absent from this
+	// rm: it has to stay untouched until the rename (#26).
+	if _, _, _, err := s.Run(fmt.Sprintf("rm -f %s", qTmp), timeout); err != nil {
 		return nil, err
 	}
 	if _, _, _, err := s.Run(fmt.Sprintf(": > %s", qTmp), timeout); err != nil {
@@ -912,20 +947,29 @@ func (s *Session) putBytesOverBase64(data []byte, remotePath string, timeout tim
 		// guard against an empty chunk degenerating into a bare quote.
 		cmd := fmt.Sprintf("printf '%%s' '%s' >> %s", enc[off:end], qTmp)
 		if _, _, _, err := s.Run(cmd, timeout); err != nil {
+			s.Run(fmt.Sprintf("rm -f %s", qTmp), timeout)
 			return nil, fmt.Errorf("chunk %d/%d: %w", chunks+1, total, err)
 		}
 		chunks++
 	}
 
-	// Decode into place, drop the artefact, and verify the size, so a
-	// truncated transfer is caught here rather than by whatever later tries
-	// to use the file.
-	if _, _, _, err := s.Run(fmt.Sprintf("base64 -d %s > %s", qTmp, qRemote), timeout); err != nil {
+	// Decode onto the sibling, then rename into place. A failure at either
+	// step leaves the OLD file exactly as it was; the artefacts go so a
+	// failed transfer leaves no stray file next to the destination.
+	if _, _, _, err := s.Run(fmt.Sprintf("base64 -d %s > %s", qTmp, qStaged), timeout); err != nil {
+		s.Run(fmt.Sprintf("rm -f %s %s", qTmp, qStaged), timeout)
+		return nil, err
+	}
+	if _, _, _, err := s.Run(fmt.Sprintf("mv -f %s %s", qStaged, qTarget), timeout); err != nil {
+		s.Run(fmt.Sprintf("rm -f %s %s", qTmp, qStaged), timeout)
 		return nil, err
 	}
 	s.Run(fmt.Sprintf("rm -f %s", qTmp), timeout)
 
-	remote, local, err := s.verifyUpload(remotePath, data, timeout)
+	// The size and the checksum are read back from the host, so the result
+	// can state that the file arrived intact rather than merely that the
+	// write did not fail.
+	remote, local, err := s.verifyUpload(target, data, timeout)
 	if err != nil {
 		return nil, err
 	}
