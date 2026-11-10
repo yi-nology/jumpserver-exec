@@ -33,9 +33,13 @@ skills/
 ```bash
 cd /path/to/jumpserver-exec
 s=jms-exec-ops
-mkdir -p ~/.minimax/agents/mavis/skills/$s
+mkdir -p ~/.minimax/agents/mavis/skills/$s/references
 cp skills/$s/SKILL.md ~/.minimax/agents/mavis/skills/$s/
+cp skills/$s/references/*.md ~/.minimax/agents/mavis/skills/$s/references/
 ```
+
+⚠️ **references/ 也要拷**：SKILL.md 里的配方与协议细节都住在 references/（巡检配方、
+连通性排障配方、koko TUI 协议），只拷 SKILL.md 的话那些链接全是死链。
 
 **skill 放在仓里而不是只放在 agent 目录**，是因为：
 - 跟着代码走版本化，改了工具表不用手动同步两份
