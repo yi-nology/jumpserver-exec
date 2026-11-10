@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 	"github.com/yi-nology/jumpserver-exec/internal/config"
@@ -353,5 +354,50 @@ func TestSweepTimingPricesTheSameWaveAtAnyWidth(t *testing.T) {
 	twoWaves, _, _ := sweepTiming(assets, pooled, 1, 4, 60, cost)
 	if oneWave >= twoWaves {
 		t.Errorf("more concurrency did not make the sweep cheaper: %v vs %v", oneWave, twoWaves)
+	}
+}
+
+// The per-command timeout answers to a ceiling, and the ceiling has to hold
+// BEFORE the multiplication (#27): `want` is a 64-bit int, and
+// `time.Duration(want) * time.Second` wraps — want=9223372037 came out
+// NEGATIVE, which sailed past the caller's `timeout > 600s` clamp (a
+// negative is not greater) and reached the polling loop as a deadline in the
+// past; want=18446744074 wrapped onto a 290ms positive, which the clamp
+// watched pass by. The audit trail then said "the command may already be
+// running on the machine" about a command that had just been cut off.
+func TestCommandTimeoutClampsBeforeTheMultiplication(t *testing.T) {
+	cases := []struct {
+		name string
+		want int
+		def  int
+	}{
+		{"unset uses the default", 0, 60},
+		{"a negative ask is the unset case", -1, 60},
+		{"an in-range ask passes through", 60, 60},
+		{"the boundary itself is allowed", 600, 60},
+		{"one over the ceiling clamps", 601, 60},
+		{"a large ask clamps", 100000, 60},
+		{"the wrap-to-negative point (measured 2026-11-10)", 9223372037, 60},
+		{"one past the wrap point", 9223372038, 60},
+		{"the wrap-to-tiny-positive point (measured 2026-11-10)", 18446744074, 60},
+		{"int64 overflow territory", 9223372036854775807, 60},
+		{"a default above the ceiling clamps too", 0, 3600},
+	}
+	for _, c := range cases {
+		got := commandTimeout(c.want, c.def)
+		if got <= 0 || got > maxCommandSeconds*time.Second {
+			t.Errorf("%s: commandTimeout(%d, %d) = %v, want it in (0, %s]",
+				c.name, c.want, c.def, got, maxCommandSeconds*time.Second)
+		}
+	}
+
+	// The two spellings that must stay distinguishable: the default and the
+	// ceiling are the contract's two ends.
+	if got := commandTimeout(0, 60); got != 60*time.Second {
+		t.Errorf("commandTimeout(0, 60) = %v, want 60s (the default)", got)
+	}
+	if got := commandTimeout(9223372037, 60); got != maxCommandSeconds*time.Second {
+		t.Errorf("commandTimeout(9223372037, 60) = %v, want %s (the ceiling)",
+			got, maxCommandSeconds*time.Second)
 	}
 }

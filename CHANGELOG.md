@@ -5,6 +5,32 @@
 
 ## [Unreleased]
 
+### 变更
+
+- **地板提升**：go 指令 1.26.0 → 1.27.0；`go get -u ./...` 全量升级
+  （含底座 jumpserver-kit v0.12.4 → v0.12.5——带上 risk 门四个漏判修复），
+  restore-go-modcache.sh 清单与 go.mod 逐版本同步（三方一致守卫盯着）。
+  无破坏性升级：guardx/tools 随底座钉住的 v0.23.4 / v0.13.4 走（indirect）。
+
+### 修复
+
+- **commandTimeout 在乘法之前钳位**（#27）：`want` 是 64 位 int，
+  `time.Duration(want) * time.Second` 回绕——9223372037 变负值击穿
+  「max 600」钳位（负数不满足 `>`），轮询循环首次判断即超时，留痕却写
+  「命令可能仍在机器上运行」；18446744074 回绕成 290ms 正值，钳位看着
+  生效实际四分之一秒掐断。上限收进 commandTimeout 单点（乘法之前），
+  run / collect / file 六处无自带钳位的调用点一并受益；exec.go 的旧钳位
+  删除（已死代码）。jsonschema tag 无法承载 `maximum`（SDK 只读 description，
+  `WORD=` 前缀直接报错），入参校验期拦截不可行，靠单点钳位兜底——守卫
+  测试钉住溢出点两侧。
+- **base64 传输路兑现三条自述保证**（#26）：照抄 channel 路已经做对的
+  两步——`readlink -f` 先解析符号链接（写到链接的真身，`current ->
+  release/v1.conf` 的发布布局不再被换成普通文件）；base64 解到目标的
+  同级临时名后 `mv -f` 改名就位（同级=同文件系统=原子）；开场的 `rm -f`
+  只清 /tmp 中转原料，**绝不预删目标**——传输中途失败留下的是完整的旧
+  文件而不是空缺。守卫测试读假后端录下的命令序列：不含对目标的删除、
+  含一次 sibling→target 的 mv、块失败/解码失败/改名失败都清理中转物。
+
 ## [0.15.0] - 2026-11-09
 ### 新增
 - **issue 批收编第三轮**（ee67ddf + 增量修复）：`jmsx_bg_check` 加 `cleanup=true`

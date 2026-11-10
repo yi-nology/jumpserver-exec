@@ -68,6 +68,14 @@ func effectiveTimeout(want int) int {
 	return want
 }
 
+// maxCommandSeconds is the ceiling every per-command timeout answers to.
+//
+// The tool descriptions say "max 600" — that is a contract the CALLER reads
+// to plan by, so the implementation has to keep it: a timeout of -292471
+// years (or of 290 milliseconds, the sneakier wrap) breaks the same promise
+// from the other side.
+const maxCommandSeconds = 600
+
 // commandTimeout is the per-command timeout a single-machine tool will
 // actually use: the default when the caller did not say.
 //
@@ -75,11 +83,23 @@ func effectiveTimeout(want int) int {
 // semantics — it is the same idea at the one-command scale, and the two
 // spellings used to be hand-rolled at every call site, drifting in their
 // defaults before they were collected here.
+//
+// ⚠️ The ceiling is applied BEFORE the multiplication (#27): `want` is a
+// 64-bit int and `time.Duration(want) * time.Second` wraps — want=9223372037
+// came out as a negative duration, which sailed past the caller's
+// `timeout > 600s` clamp (a negative is not greater), reached the polling
+// loop as a deadline in the past, and ended up in the audit trail as "the
+// command may already be running on the machine" when the truth was that it
+// was cut off before finishing a single poll. Wrapping onto a TINY POSITIVE
+// (want=18446744074 → 290ms) is the sneakier twin: the clamp looks like it
+// worked and the command dies in a quarter second. Bounding before the
+// multiply makes the wrap unreachable, and every call site benefits at once
+// — run/collect/file had no clamp of their own.
 func commandTimeout(want, def int) time.Duration {
 	if want <= 0 {
-		return time.Duration(def) * time.Second
+		want = def
 	}
-	return time.Duration(want) * time.Second
+	return time.Duration(min(want, maxCommandSeconds)) * time.Second
 }
 
 // planSweep prices a sweep of `hosts` machines, each running
