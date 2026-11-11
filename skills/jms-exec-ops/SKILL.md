@@ -6,10 +6,11 @@ description: |
   机器负载 / 网络连通性排障 / 传文件 / 下载文件 / 跑长任务 / 部署脚本 / 查本机执行留痕（谁试过什么、被谁拦下）, or when a jmsx_*
   tool is available. Covers session
   cost, parallel fan-out, detached long jobs, the ~40-row output ceiling and how to get
-  past it, and the koko TUI protocol's current quirks. Two ready recipes: fleet health
-  check and machine-vantage connectivity troubleshooting.
+  past it, and the koko TUI protocol's current quirks. Three ready recipes: fleet health
+  check, machine-vantage connectivity troubleshooting and jump-host kubectl for
+  Kubernetes assets.
 descriptions:
-  zh-Hans: "通过堡垒机在受管机器上执行命令与传文件：单条/多条/多台并发/长任务后台、文件上传下载取段、大输出截断处理、本机执行留痕查询。涉及连机器执行命令、批量下发、查磁盘日志、传文件、部署、健康巡检、查机器负载、连通性排障、查「谁试过什么被拦下了」时使用。"
+  zh-Hans: "通过堡垒机在受管机器上执行命令与传文件：单条/多条/多台并发/长任务后台、文件上传下载取段、大输出截断处理、本机执行留痕查询。涉及连机器执行命令、批量下发、查磁盘日志、传文件、部署、健康巡检、查机器负载、连通性排障、K8s 集群巡检排障（跳板机 kubectl）、查「谁试过什么被拦下了」时使用。"
 displayNames:
   zh-Hans: "堡垒机执行面"
 ---
@@ -38,6 +39,7 @@ displayNames:
 | **一个目录从一台机器推到另一台** | `jmsx_relay_dir`（tar 管道对拷，不落本机） |
 | 能不能连上 | `jmsx_reachable` |
 | **机器到它的依赖通不通**（应用排障） | 暂无工具，用连通性排障配方：[`references/connectivity.md`](references/connectivity.md) |
+| **K8s 集群巡检 / 排障** | K8s 平台资产开不出 shell，走跳板机 kubectl 配方：[`references/k8s-kubectl.md`](references/k8s-kubectl.md) |
 | 想知道连接池里现在有什么 | `jmsx_pool_status` |
 | 想先算一次会话划不划算 | `jmsx_session_cost` |
 | 不知道资产叫什么 | `jmsx_inventory` |

@@ -272,6 +272,10 @@ func (p *Pool) get(ctx context.Context, cfg Config, asset, account string, timeo
 	if err != nil {
 		return nil, false, err
 	}
+	// 平台门（exec#29）：K8s 资产开不出 shell，在挑账号与拨号之前拒。
+	if err := refuseShelllessPlatform(ref); err != nil {
+		return nil, false, err
+	}
 	// The account is resolved BEFORE the key, so that the key names the
 	// account the session will actually run as. Keying on the REQUESTED
 	// account would give one machine two connections the moment a caller

@@ -145,7 +145,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 	}
 	reg.Add(r, &mcp.Tool{
 		Name:         "jmsx_reachable",
-		Description:  "Check whether the bastion can open a shell on an asset (auth, permission and protocol all have to work). Use before a long job.",
+		Description:  "Check whether the bastion can open a shell on an asset (auth, permission and protocol all have to work). Use before a long job. Kubernetes assets have no shell: they answer reachable=false with the jump-host kubectl guidance, not a green light.",
 		OutputSchema: render.Schema[jmsexec.ReachableResult]()}, func(ctx context.Context, _ *mcp.CallToolRequest, args pingArgs) (*mcp.CallToolResult, any, error) {
 		if strings.TrimSpace(args.Asset) == "" {
 			return render.Failf("asset is required")

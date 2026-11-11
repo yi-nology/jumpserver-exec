@@ -5,6 +5,38 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-12
+### 新增
+
+- **K8s 配方：跳板机 kubectl 路径**（#30）：`skills/jms-exec-ops/references/
+  k8s-kubectl.md`——K8s 平台资产开不出 shell，跳板机 kubectl 是接入路径
+  （链路 2026-11-11 经 home-k8s-2 全链路实测全绿：exit 0、全输出、留痕在案；
+  首调慢是链路抖不是坏，冷开实测 17.7s）。配方带巡检/排障的命令表与分类器
+  对照（kit#28/#29/#31 落地后的档位，2026-11-12 对分类器实测）、多集群/多机
+  跑法、SA token + view 级 RBAC 的凭据链配置法；SKILL.md 工具表与描述同步，
+  `jmsx_reachable` 的 description 写明 K8s 资产答 reachable=false 不是绿灯
+  （swagger 已随 `gen-openapi.sh` 再生成）。
+
+### 修复
+
+- **K8s 平台资产的会话在开出之前拒绝**（#29）：对 `platform=Kubernetes`
+  的资产，连接令牌签得出、koko 也认令牌登录，但 koko 拒 exec 通道——命令
+  类工具（exec / run / collect / exec_multi / collect_multi）拿到的是
+  「exit 0 + 空输出」的假成功，agent 会误读成「机器上没有这个输出」。现在
+  resolveAsset 的三个会话入口（自有连接、池连接、TUI 前检）都在签令牌与
+  拨号之前按平台拒绝：错误带类型（`ErrK8sAssetNoShell`）与跳板机 kubectl
+  的指引，`delivery=not_sent`（重试安全）。⚠️ 平台拒绝**不是**
+  `ErrTokenUnavailable`——PTY 兜底对同一台资产只会漂移得更难读（同实测：
+  有时打印集群报错，有时静默断），兜底不得接管；传输/后台工具走同一会话
+  层，一并诚实拒绝。平台名大小写不敏感认 Kubernetes / k8s 缩写；空平台名
+  （没解析出来）不拒——门在证据上拒绝，不在证据缺席上。
+- **jmsx_reachable 对 K8s 资产报诚实不可达**（#31）：前置检查工具此前对
+  K8s 资产报 `reachable=true` 的假绿灯（探测命令「跑成功」，输出其实是
+  koko 的拒绝文案），agent 看到 true 就投整批任务、整批假成功。现在答复
+  是 `reachable=false` + `error` 指引跳板机 kubectl + `delivery=not_sent`
+  ——仍是工具的一次正常返回（前置检查的职责是报告，不是拒绝调用）。不另
+  加 `shell_capable` 字段：reason 在 error 里说得清，契约不必为它长一格。
+
 ## [0.15.5] - 2026-11-11
 ### 变更
 

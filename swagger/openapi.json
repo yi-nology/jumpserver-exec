@@ -4169,7 +4169,7 @@
     },
     "/api/v1/tools/jmsx_reachable/invoke": {
       "post": {
-        "description": "[risk: read] Check whether the bastion can open a shell on an asset (auth, permission and protocol all have to work). Use before a long job.",
+        "description": "[risk: read] Check whether the bastion can open a shell on an asset (auth, permission and protocol all have to work). Use before a long job. Kubernetes assets have no shell: they answer reachable=false with the jump-host kubectl guidance, not a green light.",
         "operationId": "invoke_jmsx_reachable",
         "requestBody": {
           "content": {
