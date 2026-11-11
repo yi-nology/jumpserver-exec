@@ -37,6 +37,16 @@
   ——仍是工具的一次正常返回（前置检查的职责是报告，不是拒绝调用）。不另
   加 `shell_capable` 字段：reason 在 error 里说得清，契约不必为它长一格。
 
+### 依赖地板
+
+- **jumpserver-kit v0.12.5 → v0.13.0**（risk 门八个漏判缺口的分类器随新底座生效；
+  k8s-kubectl 配方的分类器对照表按 v0.13.0 口径）。配套地板：`oekit/concurrency v0.33.0`、
+  `oekit/network v0.10.1`、`oekit/pkg v0.44.0`、`oekit/bootstrap v0.7.6`、`oekit/core v0.14.2`、
+  `golang.org/x/crypto v0.59.0`（go get -u 全量追平，2026-11-12）。
+- **钉回**：`oagentkit/guardx 钉在 v0.23.4`（与 jumpserver-kit 同一口径——v0.24.x 带掩码/脱敏回归）。
+- `script/restore-go-modcache.sh` 的 MODULES 清单按新 go.mod 全量重生成（102 条，
+  `TestTheDependenciesArePinned` 门禁逐版本一致）。
+
 ## [0.15.5] - 2026-11-11
 ### 变更
 
