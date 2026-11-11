@@ -54,6 +54,10 @@ func openOwnConnection(ctx context.Context, cfg Config, asset, account string, t
 	if err != nil {
 		return nil, err
 	}
+	// 平台门（exec#29）：K8s 资产开不出 shell，在令牌签发与拨号之前拒。
+	if err := refuseShelllessPlatform(ref); err != nil {
+		return nil, err
+	}
 	acct, tok, err := resolveAndMint(ctx, cfg, ref, account)
 	if err != nil {
 		return nil, err

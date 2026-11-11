@@ -368,6 +368,12 @@ func checkAssetUsable(ctx context.Context, cfg Config, asset, account string) er
 		// Neither is a refusal: the walk decides, exactly as it always did.
 		return nil
 	}
+	// 平台门（exec#29）：解析成功就能看见平台——K8s 资产的硬拒绝必须发生
+	// 在这里，而不是留给十秒步行尽头的 PTY 漂移（实测 2026-11-11）。它不是
+	// ErrTokenUnavailable，所以 openAuto 不会为它兜底步行。
+	if err := refuseShelllessPlatform(ref); err != nil {
+		return err
+	}
 	accts, err := cfg.API.AssetAccounts(ctx, ref.ID)
 	if err != nil {
 		// The bastion cannot answer right now: not a refusal.
