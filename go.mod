@@ -13,12 +13,12 @@ go 1.27.0
 
 require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/oekit/concurrency v0.32.0
+	github.com/oekit/concurrency v0.33.0
 	github.com/oekit/logx v0.9.2
-	github.com/oekit/network v0.9.2
-	github.com/oekit/pkg v0.42.0
-	github.com/yi-nology/jumpserver-kit v0.12.5
-	golang.org/x/crypto v0.58.0
+	github.com/oekit/network v0.10.1
+	github.com/oekit/pkg v0.44.0
+	github.com/yi-nology/jumpserver-kit v0.13.0
+	golang.org/x/crypto v0.59.0
 )
 
 require (
@@ -61,7 +61,7 @@ require (
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/google/pprof v0.0.0-20261110164715-8bb1ee682bd8 // indirect
+	github.com/google/pprof v0.0.0-20261111065629-49901cbc7227 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/jhump/protoreflect v1.19.0 // indirect
@@ -74,13 +74,13 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.6 // indirect
-	github.com/oagentkit/guardx v0.24.1 // indirect
-	github.com/oagentkit/tools v0.14.3 // indirect
-	github.com/oekit/bootstrap v0.7.5 // indirect
-	github.com/oekit/core v0.14.0 // indirect
+	github.com/oagentkit/guardx v0.23.4 // indirect
+	github.com/oagentkit/tools v0.13.4 // indirect
+	github.com/oekit/bootstrap v0.7.6 // indirect
+	github.com/oekit/core v0.14.2 // indirect
 	github.com/oekit/kitex v0.7.18 // indirect
 	github.com/oekit/logx/kitexlog v0.1.11 // indirect
-	github.com/oekit/metrics v0.2.3 // indirect
+	github.com/oekit/metrics v0.3.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/orcaman/concurrent-map v1.0.0 // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
