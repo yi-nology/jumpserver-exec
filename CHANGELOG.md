@@ -5,7 +5,10 @@
 
 ## [Unreleased]
 
-## [0.16.0] - 2026-11-12
+## [0.16.1] - 2026-11-12
+
+> 说明：本段内容随 v0.16.1 首次发布。v0.16.0 tag 仅为依赖地板标记（无 release
+> commit、无 GitHub release），其内容即本段，未单独发布。
 ### 新增
 
 - **K8s 配方：跳板机 kubectl 路径**（#30）：`skills/jms-exec-ops/references/
