@@ -66,7 +66,7 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 		// confirm=true granted earlier satisfies the gate for the identical
 		// command on the identical asset, and the note it returns rides into
 		// the answer so the trail shows why a dangerous command ran.
-		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm)
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm, false)
 		if !would {
 			return render.Text(blockedCommand(args.Asset, args.Command, riskClass, blocked))
 		}

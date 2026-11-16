@@ -220,7 +220,7 @@ func registerExecMultiTool(r *reg.Registry, cfg config.Config, mem approvalMemor
 		// call's own identity: the joined asset list plus the command. A
 		// remembered approval therefore covers exactly this sweep again —
 		// same hosts, same command — and nothing wider.
-		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), args.Command, cmdClass, args.Confirm)
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), args.Command, cmdClass, args.Confirm, args.DryRun)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, 1, concurrency, effectiveTimeout(args.Timeout))

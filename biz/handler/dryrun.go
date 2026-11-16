@@ -39,6 +39,11 @@ type approvalMemory interface {
 // falls through to the shared risk verdict. The note it returns goes into
 // the answer's note field, so the trail shows WHY a dangerous command ran.
 //
+// dryRun marks the rehearsal: a dry run must have NO side effect, so a
+// confirm=true on the dry-run path answers "it would run" but grants
+// NOTHING — the memory is written only when the real call carries the
+// confirmation.
+//
 // The memory key is the EXACT command on the EXACT asset: an approval is
 // reused only for the identical call, never widened to "similar" commands —
 // widening is how a remembered rm -rf /tmp/x becomes a licence for
@@ -47,17 +52,19 @@ type approvalMemory interface {
 // read-only mode (the gate's whitelist currently lets conditional write
 // tools reach the handler there), so under JMS_READ_ONLY=1 this degrades
 // to the plain risk verdict.
-func rehearsalM(mem approvalMemory, asset, command string, class jms.CommandClass, confirm bool) (riskClass string, would bool, blocked string, note string) {
+func rehearsalM(mem approvalMemory, asset, command string, class jms.CommandClass, confirm bool, dryRun bool) (riskClass string, would bool, blocked string, note string) {
 	riskClass = class.String()
 	if !risk.RequiresConfirmation(class) {
 		return riskClass, true, "", ""
 	}
 	if confirm {
 		if mem != nil && mem.Enabled() {
-			mem.Grant(asset, command)
-		}
-		if mem != nil && mem.Enabled() {
-			note = fmt.Sprintf("dangerous command confirmed and remembered; this exact command on this asset needs no further confirmation for %s", mem.TTL())
+			if dryRun {
+				note = fmt.Sprintf("dangerous command confirmed; a real run would remember this approval for %s (dry run: nothing granted)", mem.TTL())
+			} else {
+				mem.Grant(asset, command)
+				note = fmt.Sprintf("dangerous command confirmed and remembered; this exact command on this asset needs no further confirmation for %s", mem.TTL())
+			}
 		}
 		return riskClass, true, "", note
 	}
@@ -74,8 +81,9 @@ func rehearsalM(mem approvalMemory, asset, command string, class jms.CommandClas
 // dryRunCommand is the dry-run answer of a single command.
 func dryRunCommand(mem approvalMemory, asset, command string, class jms.CommandClass, confirm bool) *jmsexec.CommandResult {
 	// It would run if it needs no confirmation — or if the confirmation is
-	// already there, given live or remembered.
-	riskClass, would, blocked, note := rehearsalM(mem, asset, command, class, confirm)
+	// already there, given live or remembered. A rehearsal grants nothing:
+	// dryRun=true keeps the approval memory untouched.
+	riskClass, would, blocked, note := rehearsalM(mem, asset, command, class, confirm, true)
 	if note == "" {
 		note = render.RehearsalNote
 	}

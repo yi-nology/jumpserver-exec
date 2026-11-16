@@ -60,7 +60,7 @@ func registerRunTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 		// The batch is one approval unit: the joined command list is the
 		// memory key, so a remembered approval covers exactly this batch
 		// on this asset — nothing wider.
-		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(args.Commands, "\n"), cmdClass, args.Confirm)
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(args.Commands, "\n"), cmdClass, args.Confirm, args.DryRun)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			return render.Text(res)

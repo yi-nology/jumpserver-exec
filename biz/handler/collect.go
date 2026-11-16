@@ -147,7 +147,7 @@ func registerCollectTool(r *reg.Registry, cfg config.Config, mem approvalMemory)
 		}
 		// The check list is the memory key: a remembered approval covers
 		// exactly these commands on this asset, in this order.
-		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm)
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm, args.DryRun)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			return render.Text(res)
@@ -222,7 +222,7 @@ func registerCollectMultiTool(r *reg.Registry, cfg config.Config, mem approvalMe
 		// The sweep is judged at the call level, so its memory key is the
 		// call's own identity: the joined asset list plus the joined check
 		// commands. A remembered approval covers exactly this sweep again.
-		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm)
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm, args.DryRun)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, len(args.Checks), concurrency, effectiveTimeout(args.Timeout))

@@ -50,7 +50,7 @@ func registerBgStartTool(r *reg.Registry, cfg config.Config, mem approvalMemory)
 			Asset:   jms.Opt(args.Asset),
 			Command: jms.Opt(args.Command),
 		}
-		riskClass, would, blocked, approvalNote := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm)
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm, false)
 		if !would {
 			render.FillRefusal(res, riskClass, blocked)
 			return render.Text(res)
