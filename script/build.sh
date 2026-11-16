@@ -49,8 +49,8 @@ go build -o "$BIN_DIR/$BIN_NAME" "."
 echo "    产物：$BIN_DIR/$BIN_NAME"
 
 if [ "$RUN_TESTS" -eq 1 ]; then
-  echo "==> 跑测试"
-  go test ./...
+  echo "==> 跑测试（-race：池的并发护栏与共享状态的竞态只有 race  detector 看得见）"
+  go test -race ./...
   echo "    全部通过"
 fi
 

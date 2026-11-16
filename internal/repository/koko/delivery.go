@@ -72,6 +72,11 @@ func timeoutWithOutput(asset string, timeout time.Duration, out string) error {
 		bounded := out
 		if len(bounded) > 4096 {
 			bounded = bounded[len(bounded)-4096:]
+			// 字节下刀可能落在多字节 UTF-8 字符中间：剥掉开头的续字节，
+			// 让诊断输出从完整字符开始（截掉的只可能是被切碎的那一个字）。
+			for len(bounded) > 0 && bounded[0]&0xC0 == 0x80 {
+				bounded = bounded[1:]
+			}
 		}
 		text += fmt.Sprintf("\noutput so far (last %d bytes):\n%s", len(bounded), bounded)
 	}

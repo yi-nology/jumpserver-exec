@@ -137,6 +137,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | `jmsx_put_dir` | 上传**整个目录**（tar 流走通道 stdin，合并语义：同名覆盖、不删远端已有条目）；要 `confirm=true` |
 | `jmsx_get_file` | 读文件；支持 `offset`/`length` 在**远端**取段 |
 | `jmsx_get_dir` | **整目录下载**（tar 流对称 `jmsx_put_dir`；合并语义；穿越条目跳过并计数） |
+| `jmsx_relay` | **文件级机到机直传**（字节从源端通道进目标端通道，不落本地磁盘；两端各算一次 sha256）；写的是目标机器，要 `confirm=true` |
 | `jmsx_relay_dir` | **目录级机到机直传**（归档管道对拷不落本地；合并语义；无到达自证——note 说明） |
 | `jmsx_reachable` | 能不能开 shell（认证+权限+协议都要通） |
 | `jmsx_inventory` | 列堡垒机已知资产，查准确资产名 |

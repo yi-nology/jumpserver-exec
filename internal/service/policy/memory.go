@@ -45,7 +45,15 @@ func (m *Memory) Grant(asset, command string) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.hits[Key(asset, command)] = m.now().Add(m.ttl)
+	now := m.now()
+	// 顺手清扫过期项：不扫的话 map 随每次授予单调增长，进程长跑后
+	// 留一堆永远命不中也不释放的死条目。
+	for k, exp := range m.hits {
+		if now.After(exp) {
+			delete(m.hits, k)
+		}
+	}
+	m.hits[Key(asset, command)] = now.Add(m.ttl)
 }
 
 // Satisfied reports a live remembered approval and when it was granted.

@@ -115,8 +115,7 @@ hz 的 `router.go` / `router_gen.go` 在这里没有对应物：HTTP 面的路�
 5. **别跑 `go mod tidy`** —— 它要抓测试专用依赖（x/tools、x/term），沙箱下必失败。
    改依赖版本就手工同步 `go.mod` 里的 `require`。
 
-6. **构建用 `GOPROXY=off`**（脚本已经设了），**且不要带 `-mod=mod`** ——
-   只接受 `readonly`/`vendor`，带了会直接报错。
+6. **构建不要带 `-mod=mod`** ——模块模式只接受 `readonly`/`vendor`，带了会直接报错。代理走 Go 默认（`build.sh` 不写死）；离线机器用 `GOPROXY=off ./script/build.sh`，缺依赖先跑 `./script/restore-go-modcache.sh`。
 
 7. **源码树里不要留构建产物。** 产物落在 `./bin/`（发布后落在
    `~/.local/jumpserver-exec-runtime/<stamp>/`）。历史上编辑器备份文件、

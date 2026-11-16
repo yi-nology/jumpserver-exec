@@ -75,6 +75,30 @@ func TestMemoryConcurrentGrantAndSatisfied(t *testing.T) {
 	}
 }
 
+// 授予时顺手清扫过期项：拨过期的钟后一次新的授予必须把死条目清掉，
+// map 不随授予次数单调增长。内部状态从测试同包可见，直接数。
+func TestGrantSweepsExpiredEntries(t *testing.T) {
+	m := NewMemory(50 * time.Millisecond)
+	now := time.Now()
+	m.now = func() time.Time { return now }
+	m.Grant("a", "one")
+	m.Grant("a", "two")
+	if len(m.hits) != 2 {
+		t.Fatalf("hits = %d, want 2", len(m.hits))
+	}
+	now = now.Add(80 * time.Millisecond) // 两条都过期
+	m.Grant("a", "three")                // 这次授予必须顺手清掉前两条
+	if len(m.hits) != 1 {
+		t.Fatalf("expired entries not swept: hits = %d, want 1", len(m.hits))
+	}
+	if ok, _ := m.Satisfied("a", "one"); ok {
+		t.Fatal("swept entry still satisfied")
+	}
+	if ok, _ := m.Satisfied("a", "three"); !ok {
+		t.Fatal("the fresh grant was swept by mistake")
+	}
+}
+
 func TestMemoryDisabledAtZeroTTL(t *testing.T) {
 	m := NewMemory(0)
 	m.Grant("a", "cmd") // 不 panic

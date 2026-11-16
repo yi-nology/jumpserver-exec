@@ -149,7 +149,10 @@ func registerCollectTool(r *reg.Registry, cfg config.Config, mem approvalMemory)
 		// exactly these commands on this asset, in this order.
 		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm, args.DryRun)
 		if args.DryRun {
-			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
+			if note == "" {
+				note = render.RehearsalNote
+			}
+			render.FillRehearsal(res, riskClass, would, blocked, note)
 			return render.Text(res)
 		}
 		if !would {
@@ -224,7 +227,10 @@ func registerCollectMultiTool(r *reg.Registry, cfg config.Config, mem approvalMe
 		// commands. A remembered approval covers exactly this sweep again.
 		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm, args.DryRun)
 		if args.DryRun {
-			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
+			if approvalNote == "" {
+				approvalNote = render.RehearsalNote
+			}
+			render.FillRehearsal(res, riskClass, would, blocked, approvalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, len(args.Checks), concurrency, effectiveTimeout(args.Timeout))
 			return render.Text(res)
 		}

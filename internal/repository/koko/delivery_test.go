@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
@@ -130,6 +131,25 @@ func TestTimeoutWithOutput(t *testing.T) {
 	}
 	if strings.Contains(s, strings.Repeat("a", 4500)) {
 		t.Fatal("output must be bounded to the tail (4KiB)")
+	}
+}
+
+// 截断按字节下刀，可能落在多字节 UTF-8 字符中间：剥掉续字节后错误文本
+// 必须是合法 UTF-8，且尾巴上的标记还在。
+func TestTimeoutWithOutputCutOnRuneBoundary(t *testing.T) {
+	big := strings.Repeat("中", 3000) + "TAIL"
+	err := timeoutWithOutput("node-9", 30*time.Second, big)
+	s := err.Error()
+	i := strings.Index(s, "output so far")
+	if i < 0 {
+		t.Fatal("missing output section")
+	}
+	payload := s[i:]
+	if !utf8.ValidString(payload) {
+		t.Fatal("the bounded output is not valid UTF-8 — the byte cut split a rune")
+	}
+	if !strings.Contains(payload, "TAIL") {
+		t.Fatal("tail marker lost")
 	}
 }
 

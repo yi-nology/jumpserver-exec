@@ -62,7 +62,10 @@ func registerRunTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 		// on this asset — nothing wider.
 		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(args.Commands, "\n"), cmdClass, args.Confirm, args.DryRun)
 		if args.DryRun {
-			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
+			if note == "" {
+				note = render.RehearsalNote
+			}
+			render.FillRehearsal(res, riskClass, would, blocked, note)
 			return render.Text(res)
 		}
 		if !would {

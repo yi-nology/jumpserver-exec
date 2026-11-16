@@ -222,7 +222,10 @@ func registerExecMultiTool(r *reg.Registry, cfg config.Config, mem approvalMemor
 		// same hosts, same command — and nothing wider.
 		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), args.Command, cmdClass, args.Confirm, args.DryRun)
 		if args.DryRun {
-			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
+			if approvalNote == "" {
+				approvalNote = render.RehearsalNote
+			}
+			render.FillRehearsal(res, riskClass, would, blocked, approvalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, 1, concurrency, effectiveTimeout(args.Timeout))
 			return render.Text(res)
 		}

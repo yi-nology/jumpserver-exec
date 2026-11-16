@@ -60,6 +60,17 @@
 
 ### 修复
 
+- **多机工具与 jmsx_run 的 dry-run 现在也说「为什么」**：`jmsx_exec` 的演练
+  早已带审批记忆的 note（命中/授予说明），其余四个工具（run / exec_multi /
+  collect / collect_multi）的演练却只填干巴巴的 "dry run" —— 同样一次记忆
+  命中，exec 解释原因、它们不说。现在统一：note 有了就用 note。
+- **拨号重拨收编 `sshx.DialWithPolicy`**（network#125）：删掉手写的重试循环
+  与失败分类函数；`JMS_KOKO_DIAL_RETRIES=0` 的「关掉重拨」语义显式旁路裸
+  Dial（上游把 ≤0 提升为默认 1 次，0 会被吃掉——verifier 收编审阅抓出）。
+  预算跨尝试共享，重拨不再把超时放大 2 倍。
+- **超时回执的 4KiB 截断落在字符边界**：字节下刀可能切碎多字节 UTF-8，
+  现在剥掉续字节，诊断输出从完整字符开始。
+- **审批记忆的过期条目在授予时顺手清扫**：map 不再随授予次数单调增长。
 - **K8s 平台资产的会话在开出之前拒绝**（#29）：对 `platform=Kubernetes`
   的资产，连接令牌签得出、koko 也认令牌登录，但 koko 拒 exec 通道——命令
   类工具（exec / run / collect / exec_multi / collect_multi）拿到的是
