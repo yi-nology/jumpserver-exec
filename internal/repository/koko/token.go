@@ -326,9 +326,16 @@ var ErrNoAccountOnAsset = errors.New("no usable account on the asset")
 
 // runText runs a command and returns its output, with stderr merged into
 // stdout the way the shell's `2>&1` does.
+//
+// On a timeout the partial output collected so far rides with the error
+// (bounded to the last 4KiB): the state is unknown, and the words the
+// operator reads to decide about a retry stay the first line.
 func (t *tokenBackend) runText(command string, timeout time.Duration) (string, int, error) {
 	out := &mergedBuffer{}
 	code, err := t.run(command, nil, out, out, timeout)
+	if err != nil && errors.Is(err, ErrCommandTimeout) {
+		return out.String(), -1, timeoutWithOutput(t.asset, timeout, out.String())
+	}
 	return out.String(), code, err
 }
 

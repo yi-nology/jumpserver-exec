@@ -3,7 +3,9 @@ package koko
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
@@ -100,5 +102,43 @@ func TestTheDeliveryStateSaysItInWords(t *testing.T) {
 	}
 	if got := ErrCommandTimeout.Error(); got == "" {
 		t.Error("the timeout error says nothing")
+	}
+}
+
+// The kael-style receipt-timeout error: the command was delivered and ran
+// past the deadline, so the state is unknown, the partial output collected
+// so far is kept (bounded to the last 4KiB), and the text still says the
+// one sentence that decides whether a retry is allowed.
+func TestTimeoutWithOutput(t *testing.T) {
+	big := strings.Repeat("a", 5000) + "TAIL-MARKER"
+	err := timeoutWithOutput("node-9", 30*time.Second, big)
+	if !errors.Is(err, ErrCommandTimeout) {
+		t.Fatal("must wrap ErrCommandTimeout")
+	}
+	if reg.DeliveryOf(err) != jms.Delivery_maybe_sent {
+		t.Fatal("delivery must stay maybe_sent")
+	}
+	s := err.Error()
+	if !strings.HasPrefix(s, "execution_state_unknown:") {
+		t.Fatalf("missing state word: %.60q", s)
+	}
+	if !strings.Contains(s, "may still be running") {
+		t.Fatal("missing replay warning")
+	}
+	if !strings.Contains(s, "TAIL-MARKER") {
+		t.Fatal("missing partial output")
+	}
+	if strings.Contains(s, strings.Repeat("a", 4500)) {
+		t.Fatal("output must be bounded to the tail (4KiB)")
+	}
+}
+
+func TestTimeoutWithOutputEmpty(t *testing.T) {
+	err := timeoutWithOutput("node-9", 30*time.Second, "")
+	if !errors.Is(err, ErrCommandTimeout) {
+		t.Fatal("empty output must still classify")
+	}
+	if strings.Contains(err.Error(), "output so far") {
+		t.Fatal("no output section when nothing captured")
 	}
 }

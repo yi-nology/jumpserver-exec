@@ -15,6 +15,9 @@ package koko
 // and the trail can answer "did it get there?" without parsing prose.
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 )
 
@@ -56,4 +59,21 @@ func maybeSent(err error) error {
 		delivery: jms.Delivery_maybe_sent,
 		cause:    err,
 	}
+}
+
+// timeoutWithOutput is the kael-style receipt-timeout error: the command was
+// delivered and ran past the deadline, so the state is unknown, the partial
+// output collected so far is kept (bounded to the last 4KiB), and the text
+// still says the one sentence that decides whether a retry is allowed.
+func timeoutWithOutput(asset string, timeout time.Duration, out string) error {
+	text := fmt.Sprintf("execution_state_unknown: the command on %s did not finish within %s "+
+		"(it may still be running on the machine — never re-run it to find out)", asset, timeout)
+	if out != "" {
+		bounded := out
+		if len(bounded) > 4096 {
+			bounded = bounded[len(bounded)-4096:]
+		}
+		text += fmt.Sprintf("\noutput so far (last %d bytes):\n%s", len(bounded), bounded)
+	}
+	return &deliveryError{text: text, delivery: jms.Delivery_maybe_sent, cause: ErrCommandTimeout}
 }
