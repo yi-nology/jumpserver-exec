@@ -257,18 +257,20 @@ func TestBgCancelCommandFunctionalShell(t *testing.T) {
 	}
 
 	// Scenario A — a REAL cancel: the job is killed by the group TERM and
-	// never writes .rc. Expect CANCELLED, rc=143, .cancelled stamped. Instead
-	// of a fixed grace sleep, poll until the child is actually its own
-	// process-group leader (pgid == pid) — the contract the group kill
-	// relies on; a fixed sleep raced the setsid on a loaded machine.
+	// never writes .rc. Expect CANCELLED, rc=143, .cancelled stamped.
+	//
+	// 两个就绪等待都不是定长 sleep：(1) 用括号子shell 启动后子shell 立即
+	// 退出，wrapper 被 reparent 给 init——它一死 init 立刻收尸，测试 shell
+	// 忙闲带来的僵尸窗口被消掉（僵尸会让 kill -0 报活，生产行在 Linux 的
+	// 收尸时机下会 flaky）；(2) 轮询 pid 文件落盘 + pgid==pid（组杀的合同），
+	// 固定 sleep 在满载机上和 setsid 竞态。
 	t.Run("real_cancel_records_143", func(t *testing.T) {
 		job := filepath.Join(t.TempDir(), "job.log")
-		out := run(fmt.Sprintf(`%s sleep 30 > %s 2>&1 < /dev/null &
-echo $! > %s
+		out := run(fmt.Sprintf(`( %s sh -c 'echo $$ > "$1"; exec sleep 30' _ %s > %s 2>&1 < /dev/null & )
 i=0
-while [ "$(ps -o pgid= -p $(cat %s) 2>/dev/null | tr -d ' ')" != "$(cat %s)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i+1)); done
+while { [ ! -s %s ] || [ "$(ps -o pgid= -p $(cat %s 2>/dev/null) 2>/dev/null | tr -d ' ')" != "$(cat %s 2>/dev/null)" ]; } && [ $i -lt 100 ]; do sleep 0.05; i=$((i+1)); done
 %s
-`, setsid, shellx.Quote(job), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), bgCancelCommand(job)))
+`, setsid, shellx.Quote(job+".pid"), shellx.Quote(job), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), bgCancelCommand(job)))
 		if !strings.Contains(out, "CANCELLED") || strings.Contains(out, "ALREADY") {
 			t.Fatalf("real cancel must answer CANCELLED (and never ALREADY): %q", out)
 		}
@@ -282,14 +284,16 @@ while [ "$(ps -o pgid= -p $(cat %s) 2>/dev/null | tr -d ' ')" != "$(cat %s)" ] &
 
 	// Scenario B — the natural-finish race: the job ignores TERM, exits 0
 	// and writes its REAL rc during the 5s wait. Expect ALREADY rc=0 and the
-	// marker left untouched (no 143, no .cancelled).
+	// marker left untouched (no 143, no .cancelled). 就绪不等固定 sleep：
+	// trap 装好后子进程自己写 ready 文件，轮询它（bounded）再发取消行。
 	t.Run("natural_finish_during_wait_reports_real_rc", func(t *testing.T) {
 		job := filepath.Join(t.TempDir(), "job.log")
-		out := run(fmt.Sprintf(`%s sh -c 'trap "" TERM; sleep 1; echo 0 > "$1.rc"' _ %s > %s 2>&1 < /dev/null &
+		out := run(fmt.Sprintf(`%s sh -c 'trap "" TERM; echo ready > "$1.ready"; sleep 1; echo 0 > "$1.rc"' _ %s > %s 2>&1 < /dev/null &
 echo $! > %s
-sleep 0.5
+i=0
+while [ ! -s %s ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i+1)); done
 %s
-`, setsid, shellx.Quote(job), shellx.Quote(job), shellx.Quote(job+".pid"), bgCancelCommand(job)))
+`, setsid, shellx.Quote(job), shellx.Quote(job), shellx.Quote(job+".pid"), shellx.Quote(job+".ready"), bgCancelCommand(job)))
 		if !strings.Contains(out, "ALREADY rc=0") || strings.Contains(out, "CANCELLED") {
 			t.Fatalf("natural finish must answer ALREADY rc=0 (and never CANCELLED): %q", out)
 		}
