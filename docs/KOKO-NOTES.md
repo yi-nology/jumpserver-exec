@@ -80,7 +80,7 @@ file on the machine, so it always asks. The read-only tools
 | `jmsx_collect_multi` | The same facts from many hosts, returned as a matrix (row = host, column = fact); `dry_run=true` prices the sweep before it runs |
 | `jmsx_put_file` | Upload a file: base64 chunks, **size verified after the write**, sha256 reported |
 | `jmsx_get_file` | Download a file in base64 chunks; reads back what one screen cannot hold at once |
-| `jmsx_bg_start` / `jmsx_bg_check` | Long work, detached from the session: start it, then poll its state and exit code |
+| `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_bg_cancel` | Long work, detached from the session: start it, poll its state (five states: running/success/error/cancelled/timeout) and exit code, or kill the whole process group |
 | `jmsx_reachable` | Check that the bastion can open a shell on an asset |
 | `jmsx_inventory` | List assets with address, platform, connectivity, protocols |
 | `jmsx_session_cost` | Quantify what a session costs and what it saves |

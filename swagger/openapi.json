@@ -119,7 +119,7 @@
           },
           "cleanup": {
             "type": "boolean",
-            "description": "after a FINISHED check, also remove the output file and exit marker from the asset (they can reach GBs for a verbose task). Needs confirm=true (it deletes files on the machine). Refused while the task is still running: the files are its live output"
+            "description": "after a finished check (success/error state), also remove the output file and exit marker from the asset (they can reach GBs for a verbose task). Needs confirm=true (it deletes files on the machine). Refused while the task is still running: the files are its live output"
           },
           "confirm": {
             "type": "boolean",

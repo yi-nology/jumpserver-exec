@@ -5,6 +5,43 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **后台命令可取消**（借鉴 kael）：新工具 `jmsx_bg_cancel` —— 按 `.pid` 标记
+  `kill -TERM` 整个进程组（setsid 后该 pid 即进程组组长），5 秒未退报
+  `still_running`（不假设已死）；早已结束不动它的 `.rc`（`already_finished`），
+  老任务无 `.pid` 报 `no_marker`。它是机器上的写（杀活进程）⇒ **无条件
+  `confirm=true`**，与 `jmsx_put_file` 同档。`jmsx_bg_start` 相应落三个标记：
+  `.pid` / `.started` / `.cancelled`（随重跑清理），答复新增 `pid_marker` 字段。
+- **bg 五态对齐 kael**：`jmsx_bg_check` 的 `state` 是 `running` / `success` /
+  `error` / `cancelled` / `timeout` —— `.cancelled` 最优先判定，协议层的
+  `FINISHED` 由解析层按退出码映射成 success/error，`timeout` 支只在
+  `JMS_BG_TTL>0` 时存在。`RUNNING` 分支永不删文件的纪律不变。
+- **审批记忆**（借鉴 kael Approval）：同一台资产上**同一条命令**的
+  `confirm=true` 在 `JMS_APPROVAL_MEMORY_TTL`（默认 10m）窗口内可复用 ——
+  六个条件确认门接入 `policy.Memory`；命中与授予都写进答复的 `note`
+  （免确认**不免留痕**）。⚠️ `dry_run=true` 的排练**不授予**记忆（零副作用）。
+- **超时回执带部分输出**（借鉴 kael 回执超时）：命令撞上工具超时时，
+  答复是 `execution_state_unknown` + 已产出输出的 4KiB 尾部 —— 不猜、不装成功；
+  `maybe_sent` 分类不变（可能还在机器上跑着的仍绝不重放）。
+- 新环境变量 `JMS_APPROVAL_MEMORY_TTL`（默认 10m，`0` 关闭）与 `JMS_BG_TTL`
+  （默认 `0` 不启用；需 `>=1s` 才有效，亚秒值截断为 0 会立即 timeout）。
+
+### 变更
+
+- **依赖全面升级**（oekit / oagentkit 11 项）：`oekit/pkg v0.44.0 → v0.52.0`、
+  `oekit/network v0.10.1 → v0.11.2`、`oekit/concurrency v0.33.0 → v0.38.1`、
+  `oekit/logx v0.9.2 → v0.11.0`、`oekit/bootstrap v0.7.6 → v0.7.13`、
+  `oekit/core v0.14.2 → v0.15.4`、`oekit/kitex v0.7.18 → v0.8.3`、
+  `oekit/logx/kitexlog v0.1.11 → v0.1.12`、`oekit/metrics v0.3.0 → v0.4.1`、
+  `oagentkit/guardx v0.23.4 → v0.28.0`、`oagentkit/tools v0.13.4 → v0.15.0`。
+  **红利**：`oagentkit/tools` 的 bashguard 分类收紧随升级自动流入 kit 的风险
+  分类器（少量以前漏判的命令现在会判成 DANGEROUS 要 `confirm=true`）——
+  方向是更安全，属预期行为变化；`restore-go-modcache.sh` 清单已同步。
+- **工具数 18 → 19**（无 REST 凭据时 17 → 18）：新增 `jmsx_bg_cancel`；
+  `jmsx_inventory` 仍只在有 REST 凭据时注册。文档（README / AGENTS.md /
+  CONFIGURATION.md / KOKO-NOTES.md）与 skills 工具表同步。
+
 ## [0.16.1] - 2026-11-12
 
 > 说明：本段内容随 v0.16.1 首次发布。v0.16.0 tag 仅为依赖地板标记（无 release

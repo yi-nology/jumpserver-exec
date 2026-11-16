@@ -276,7 +276,7 @@ func registerBgCheckTool(r *reg.Registry, cfg config.Config) {
 	type bgCheckArgs struct {
 		Asset   string `json:"asset" jsonschema:"asset name or address"`
 		Path    string `json:"path" jsonschema:"the output path returned by jmsx_bg_start"`
-		Cleanup bool   `json:"cleanup,omitempty" jsonschema:"after a FINISHED check, also remove the output file and exit marker from the asset (they can reach GBs for a verbose task). Needs confirm=true (it deletes files on the machine). Refused while the task is still running: the files are its live output"`
+		Cleanup bool   `json:"cleanup,omitempty" jsonschema:"after a finished check (success/error state), also remove the output file and exit marker from the asset (they can reach GBs for a verbose task). Needs confirm=true (it deletes files on the machine). Refused while the task is still running: the files are its live output"`
 		Confirm bool   `json:"confirm,omitempty" jsonschema:"must be true when cleanup is true (cleanup deletes files on the machine). A plain status check does not need it"`
 	}
 

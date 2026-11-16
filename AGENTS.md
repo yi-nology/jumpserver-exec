@@ -3,7 +3,7 @@
 > 给 AI agent 的作业说明。**改这个仓的代码前先读完本页**，尤其第 1、2 节。
 
 本仓 = JumpServer 堡垒机的**执行面** MCP 服务：经堡垒机 koko(2222) 在**受管机器**上
-跑命令、传文件。**18 个工具**，一个二进制 `jumpserver-exec`。
+跑命令、传文件。**19 个工具**，一个二进制 `jumpserver-exec`。
 面向人读的完整说明在 [`README.md`](README.md)，
 **配置与排障看 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**。
 
@@ -37,7 +37,7 @@ cmd/                        # 子命令（入口层 import 的**普通包**，�
 ├── doctor/                 #   自检：koko 接线
 └── tools/                  #   工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 biz/
-├── handler/                # 18 个工具的实现
+├── handler/                # 19 个工具的实现
 ├── model/jmsexec/          # 契约的生成物（thriftgo slim 模板，产物入库）
 └── router/                 # 装配：注册哪些工具
 internal/
@@ -290,14 +290,14 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ### 2.10 输出形状全部是契约类型
 
-- ⚠️ **执行面 18 个工具的输出形状全部是契约类型**（`idl/`），
+- ⚠️ **执行面 19 个工具的输出形状全部是契约类型**（`idl/`），
   `render.Object` 一个不剩（`biz/handler/contract_test.go` 盯着）。
   契约类型由工具**直接产出**，不是现拼的 map —— 所以键名写错编译期就红。
 - 契约词汇：`SessionStats`（会话的账：握手多久、省了多少）、
   `SweepPlan`（一次批量作业的估算：几轮、多久、并发拉满能省多少）、
   `Check`/`Fact`（要采的事实 / 采回来的事实）、`MatrixRow`（批量采集里的一台）、
   `HostResult`（批量执行里的一台）、`BatchResult`/`CollectResult`/`ReachableResult`/
-  `PutFileResult`/`GetFileResult`/`BgStartResult`/`BgCheckResult`/`SessionCostResult`。
+  `PutFileResult`/`GetFileResult`/`BgStartResult`/`BgCheckResult`/`BgCancelResult`/`SessionCostResult`。
 - ⚠️ `koko.Session.Stats()` 直接返回 `*jmsexec.SessionStats` —— 那六个键是固定的，
   不是动态 map，**三个仓里只有这一份定义**（两处各写一份必然漂移）。
 - ⚠️ 同一工具的「跑完了 / 被拦了 / 演练过」共用一个契约类型：演练与被拦时
@@ -315,6 +315,16 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
   底数来自 `internal/repository/koko/cost.go`：**握手与单命令耗时是实测的**（`koko.Open` 计时，
   取中位数），没量过时用文档默认值并标出来。
   ⚠️ 演练**不开会话**，所以 `plan` 是按已测成本推算，不是「跑过了」。
+- **审批记忆**（kael 借鉴）：同一台资产上**同一条命令**的 `confirm=true` 在
+  `JMS_APPROVAL_MEMORY_TTL`（默认 10m）窗口内可复用 —— 第二次调用免确认，
+  但**只免确认，不免留痕**：命中与授予都写进答复的 `note`（留痕可见）。
+  ⚠️ `dry_run=true` 的排练**不授予**记忆（零副作用）。设 `0` 关闭。
+- **后台命令是五态**（kael 词汇）：`jmsx_bg_check` 的 `state` 是
+  `running` / `success` / `error` / `cancelled` / `timeout` ——
+  协议层打印的 `FINISHED` 由解析层按退出码映射成 success/error；
+  `timeout` 态只在 `JMS_BG_TTL>0` 时存在（默认 0，无超时态）。
+  要中止用 `jmsx_bg_cancel`（无条件 `confirm=true`，按 `.pid` 标记杀整个进程组；
+  老任务没有 `.pid` 报 `no_marker`）。
 
 
 
@@ -322,16 +332,16 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 
 ## 3. 执行面专属铁律
 
-1. **工具数是 18，**没有 REST 凭据时**是 17**。
+1. **工具数是 19，**没有 REST 凭据时**是 18**。
    `internal/service/policy/policy_test.go` 断言的是**名字集合**而不是一个数字：
-   17 个工具是固定的（`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
-   `jmsx_exec_multi` / `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_put_file` / `jmsx_put_dir` /
+   18 个工具是固定的（`jmsx_exec` / `jmsx_run` / `jmsx_collect` / `jmsx_collect_multi` /
+   `jmsx_exec_multi` / `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_bg_cancel` / `jmsx_put_file` / `jmsx_put_dir` /
    `jmsx_get_file` / `jmsx_get_dir` / `jmsx_relay` / `jmsx_relay_dir` / `jmsx_reachable` / `jmsx_session_cost` /
    `jmsx_pool_status` / `jmsx_audit_query`），
    而 **`jmsx_inventory` 只在有 API client 时才注册**（没有 token ⇒
    `Config.APIClient()` 返回 nil ⇒ 它不存在）⇒ 所以计数是
    `want+1`（有凭据）或 `want`（没凭据）。
-   ⚠️ **口径**：对外说「18 个工具」；**没有 REST 凭据时那个数字是 17** ——
+   ⚠️ **口径**：对外说「19 个工具」；**没有 REST 凭据时那个数字是 18** ——
    别把两个数字说混，也别为了让数字好看去注册一个没凭据也能用的清单工具。
    ⚠️ 断言的是**集合**不是数字：一个改名或删除的工具，光靠计数是发现不了的。
 
@@ -381,7 +391,7 @@ SSH 协议给了一个精确的判据：服务器**先回包再执行**（RFC 42
 | 单元测试 | 同脚本内置 `go test ./...`，必须全绿（脚本会打印失败日志，不吞掉） |
 | 竞态 | 池的并发护栏在 `internal/repository/koko/pool_test.go` ⇒ **必须带 `-race` 跑** |
 | 启动 | `./script/bootstrap.sh` 能起一个进程（stdio 上说 JSON-RPC） |
-| 工具数 | **18**（无 REST 凭据时 **17**）—— `internal/service/policy/policy_test.go` 钉住这个**集合**（§3.1 同口径） |
+| 工具数 | **19**（无 REST 凭据时 **18**）—— `internal/service/policy/policy_test.go` 钉住这个**集合**（§3.1 同口径） |
 | 目录一致 | 策略表与注册表必须一一对应（同上） |
 | 契约 | 契约类型必须真被产出（`biz/model/jmsexec/contract_test.go`）；**答案本身必须是契约类型**（`internal/arch/execution_test.go` 的 `TestTheAnswerTypesAreFoundMechanically`） |
 | 分层 | 底座不得依赖任何服务；不得 import 管理面；IDL/包/模型三名对齐（`internal/arch/`） |

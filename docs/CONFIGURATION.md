@@ -150,6 +150,8 @@ jumpserver-exec --doctor    # 执行面接线 + 真实 koko 登录验证
 | `JMS_KOKO_DIAL_RETRIES` | 否 | `1` | 会话开的**握手级**失败重拨次数。只有握手失败重试——连接从未建立、零投递，「已投递绝不重放」不适用于拨号；认证拒绝是判定不是抖动，永不重试 |
 | `JMS_POOL_TTL` | 否 | `2m` | 空闲连接在池里留多久。连接池让同一台机器的第二次调用几乎免费（实测 1.04s → 0.26s）。⚠️ 池里的连接**不出现在堡垒机的会话列表里**（堡垒机记的是每条命令的 exec 会话，跑完就结束）；但资产上会留一个 `sshd-session: <user> [priv]` 进程，所以这个值越长，资产上挂着的进程越多 |
 | `JMS_BACKEND_MEMORY_TTL` | 否 | `10m` | **后端记忆**记多久：记住上次走通的是哪条路（令牌还是终端），下次先试它。记忆只改**顺序**，从不跳过一条路，也从不把资产问题变成兜底。⚠️ **会过期**：过期后回到默认顺序（先令牌）—— 令牌这条路恢复了只能靠**再试一次**找回来。设 `0` 即关闭记忆 |
+| `JMS_APPROVAL_MEMORY_TTL` | 否 | `10m` | **审批记忆**记多久：同一台资产上**同一条命令**的 `confirm=true` 在这个窗口内可复用 —— 第二次调用免确认，但**只免确认、不免留痕**（命中与授予都写进答复的 `note`）。⚠️ `dry_run=true` 的排练**不授予**记忆（零副作用）。设 `0` 即关闭 |
+| `JMS_BG_TTL` | 否 | `0` | **后台命令的超时**：`jmsx_bg_check` 的 `timeout` 态以这个值为界（从 `.started` 标记起算）。默认 `0` = **不启用**，没有超时态。⚠️ 要生效须 `>=1s` —— 亚秒值会被截断成 `0`，等于立即 timeout |
 | `JMS_READ_ONLY` | 否 | `false` | 只读模式：执行面拒掉 `jmsx_exec` / `jmsx_run` / `jmsx_exec_multi` / `jmsx_put_file` / `jmsx_bg_start`，只留采集与清单 |
 | `JMS_HTTP_ADDR` | 否 | 无（只 stdio） | **HTTP 面**监听地址（REST `/api/v1/…` + MCP over streamable HTTP `/mcp`）。⚠️ 写 `127.0.0.1:<端口>`（例 `127.0.0.1:8732`），别写 `0.0.0.0` —— 这些路由带着部署自己的凭据去打堡垒机，暴露到网络需要你自己有代理与 TLS 的故事。`serve http` 模式下必填，否则启动拒绝。详见 §3.9 |
 | `JMS_HTTP_TOKEN` | 配了 ADDR 就**是** | 无 | HTTP 面的 **Bearer 令牌**（`openssl rand -hex 32` 生成）。除 `/api/v1/health` 外每个路由都要它。⚠️ **没有「不开认证」模式**：ADDR 有、TOKEN 无 ⇒ 启动即拒。轮换 = 改环境变量重启 |
@@ -435,7 +437,7 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 ├── 采集多个事实（要带标签）   → jmsx_collect  （一次会话，返回命名好的 map）
 ├── 多台机器同一条命令        → jmsx_exec_multi （带每台的输出！）
 ├── 多台机器采同一组事实      → jmsx_collect_multi （矩阵：行=机器，列=事实）
-├── 超过 10 分钟的长任务      → jmsx_bg_start + jmsx_bg_check（跑完 cleanup=true+confirm 清垃圾）
+├── 超过 10 分钟的长任务      → jmsx_bg_start + jmsx_bg_check（跑完 cleanup=true+confirm 清垃圾；要中止用 jmsx_bg_cancel，无条件 confirm=true）
 ├── 输出超过 40 行            → jmsx_exec 加 full=true
 └── 传文件
     ├── 本地已有的文件        → jmsx_put_file（local_path）
@@ -455,6 +457,13 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 
 `jmsx_bg_start` 把长任务**脱离会话**跑（`setsid`），退出码写在 `.rc` 标记文件里 ——
 **靠它区分「还在跑」和「跑完了」**，光看输出文件存在是判断不出来的。
+
+生命周期是**五态**（kael 词汇）：`jmsx_bg_check` 的 `state` 是
+`running` / `success` / `error` / `cancelled` / `timeout`。
+要取消时 `jmsx_bg_cancel`（**无条件 `confirm=true`** —— 它杀的是机器上的活进程）
+按 `.pid` 标记 `kill -TERM` 整个进程组，5 秒内没退回报 `still_running`（不假设已死）；
+早已结束的任务不动它的 `.rc`（报 `already_finished`），老任务没有 `.pid` 标记
+报 `no_marker`（不支持取消）。`timeout` 态只在 `JMS_BG_TTL>0` 时存在（默认 0 无超时态）。
 
 ### 5.2 别的
 

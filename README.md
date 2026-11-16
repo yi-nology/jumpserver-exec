@@ -12,7 +12,7 @@
 | 仓库 | 是什么 | 工具数 |
 |---|---|---|
 | [`yi-nology/jumpserver-mgmt`](https://github.com/yi-nology/jumpserver-mgmt) | **管理面**：资产 / 账号 / 授权 / 连通性 / 命令过滤 / 标签 / 审计 / 登录策略 | 97 |
-| **`yi-nology/jumpserver-exec`**（本仓） | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 15 |
+| **`yi-nology/jumpserver-exec`**（本仓） | **执行面**：经堡垒机 koko(2222) 在受管机器上跑命令、传文件 | 19 |
 | [`yi-nology/jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) | 共用底座：协议层 / 门禁 / 输出契约 / 留痕 / 脱敏（**是库，不是服务**） | — |
 
 **AI 访问机器一律经堡垒机**，不接受直连 SSH —— 直连会丢审计录像。
@@ -132,7 +132,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | `jmsx_exec_multi` | 同一条命令跑多台机器，**带回每台的输出**（`jms_job_run` 没有 stdout）。**默认并发 4 台**。`dry_run=true` 先报「几轮、多久」 |
 | `jmsx_collect_multi` | 多台机器采**同一组事实**，返回矩阵（行=机器，列=事实） |
 | `jmsx_collect` | 一次会话采集多个事实，返回**带标签的 map** |
-| `jmsx_bg_start` / `jmsx_bg_check` | 长任务**后台化**：脱离会话跑，轮询状态与退出码；`cleanup=true`（要 `confirm=true`）在跑完后清掉输出与标记（还在跑就拒清） |
+| `jmsx_bg_start` / `jmsx_bg_check` / `jmsx_bg_cancel` | 长任务**后台化**：脱离会话跑，轮询五态（running/success/error/cancelled/timeout）与退出码；`cleanup=true`（要 `confirm=true`）在跑完后清掉输出与标记（还在跑就拒清）；要中止用 `jmsx_bg_cancel`（无条件 `confirm=true`，杀整个进程组） |
 | `jmsx_put_file` | 上传文件（base64 走同一条录像会话）；支持 `local_path` / `content` / `content_base64` |
 | `jmsx_put_dir` | 上传**整个目录**（tar 流走通道 stdin，合并语义：同名覆盖、不删远端已有条目）；要 `confirm=true` |
 | `jmsx_get_file` | 读文件；支持 `offset`/`length` 在**远端**取段 |
@@ -145,7 +145,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 <!-- /tools:exec -->
 
 ⚠️ **工具数看凭据**：`jmsx_inventory`（列资产）要 REST 凭据才注册 ——
-配了 `JUMPSERVER_TOKEN` 是 17 个，没配是 16 个（其余 16 个照常能用）。
+配了 `JUMPSERVER_TOKEN` 是 19 个，没配是 18 个（其余 18 个照常能用）。
 `jumpserver-exec tools` 列的是**当前**真正注册了的工具。
 
 ---
@@ -163,7 +163,8 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | **只读模式** | `JMS_READ_ONLY=true` ⇒ 一切会改东西的工具直接拒绝 | 管理面与执行面都支持 |
 | **HTTP 面** | REST 与 MCP over HTTP **共用同一个注册表** ⇒ 同一道门禁、同一套确认、同一份留痕；除 `/api/v1/health` 外全部要 Bearer 令牌（常量时间比较），没有「不开认证」模式 | `pkg/httpapi`（底座） |
 | **RPC 面** | kitex/thrift 第三张脸，同一注册表同一扇门：拒绝是 is_error **答案**、token 错是**传输错误**；无匿名（目录也认证） | `pkg/rpcapi` + `pkg/faces`（底座） |
-| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试 | `biz/handler` |
+| **审批记忆** | 同一台资产上**同一条命令**的 `confirm=true` 在 `JMS_APPROVAL_MEMORY_TTL`（默认 10m）窗口内可复用 —— 免确认但**不免留痕**：命中与授予都写进答复的 `note`；`dry_run` 排练不授予（`0` 关闭） | `pkg/reg`（底座） |
+| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试；超时回执带部分输出（`execution_state_unknown` + 4KiB 尾部），不猜、不装成功 | `biz/handler` |
 
 > 上面三个 `pkg/*` 现在住在
 > [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) —— 它们是两个服务
@@ -180,7 +181,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 - **koko 的终端窗口约 40 行**，输出超了会被截断；`jmsx_exec(full=true)` 可取全量。
 - **tmux 会吞掉资产面板里的空格** —— `Exec` 用 `spaceMark` 替换后再过终端。
 - **v4 没有委派凭据方案**，会话只能以 API 凭据身份跑（= 管理员面）。
-- **`jmsx_inventory` 没有 REST 凭据就不注册** ⇒ 工具数从 15 变 14（其余照常能用）。
+- **`jmsx_inventory` 没有 REST 凭据就不注册** ⇒ 工具数从 19 变 18（其余照常能用）。
 
 ---
 
@@ -195,7 +196,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 │   ├── doctor/                 ← 自检：koko 接线
 │   └── tools/                  ← 工具目录：名字、风险、确认要求；`tools openapi` 生成 HTTP 契约
 ├── biz/                        ← 业务
-│   ├── handler/                ← 16 个工具的实现
+│   ├── handler/                ← 19 个工具的实现
 │   ├── model/jmsexec/          ← 输出契约的生成物（thriftgo，产物入库）
 │   └── router/                 ← 装配：注册哪些工具
 ├── internal/                   ← 模块私有
