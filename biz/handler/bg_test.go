@@ -1,8 +1,17 @@
 package handler
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/oekit/pkg/shellx"
 )
 
 // The check's shell line is the whole protocol of bg_check, and it once
@@ -180,12 +189,26 @@ func TestBgCancelCommandLifecycle(t *testing.T) {
 // The natural-finish race (verifier必修): between the opening .rc check and
 // the 5s wait the job may exit on its own, and the wrapper then writes the
 // REAL exit code into .rc. Writing 143 over it would report "killed" for a
-// job that actually succeeded — so the dead-branch re-checks .rc BEFORE
-// writing anything, and flips to ALREADY rc=<real> when the marker appeared
-// during the wait.
+// job that actually succeeded — so the dead-branch re-checks .rc AFTER the
+// wait: marker PRESENT ⇒ report ALREADY rc=<real>; marker ABSENT ⇒ we killed
+// it ⇒ write 143.
+//
+// ⚠️ This test is POLARITY-SENSITIVE: the first version asserted only the
+// position of the re-check, and a reversed condition (`[ ! -f` instead of
+// `[ -f`) sailed through it while breaking both real scenarios (CANCELLED
+// unreachable on a real cancel; 143 still overwrites on a natural finish).
+// The re-check branch is the ONLY `elif [ -f` in the line, and it must NOT
+// be negated. The functional shell test below pins the behavior end to end.
 func TestBgCancelCommandRechecksRcBeforeWriting143(t *testing.T) {
 	line := bgCancelCommand("/tmp/x.log")
-	recheck := strings.LastIndex(line, "elif [ ! -f")
+	// Polarity: the .rc re-check must be `[ -f`, never `[ ! -f`. (The NOMARK
+	// branch legitimately negates the .pid test — scope the assertion to the
+	// .rc path.)
+	qrc := shellx.Quote("/tmp/x.log.rc")
+	if strings.Contains(line, "elif [ ! -f "+qrc) {
+		t.Fatalf("the natural-finish re-check is negated (polarity reversed): %s", line)
+	}
+	recheck := strings.LastIndex(line, "elif [ -f "+qrc)
 	write143 := strings.Index(line, "echo 143 >")
 	if recheck < 0 || write143 < 0 {
 		t.Fatalf("cancel line lost its shape: %s", line)
@@ -198,6 +221,85 @@ func TestBgCancelCommandRechecksRcBeforeWriting143(t *testing.T) {
 	if !strings.Contains(seg, "ALREADY") {
 		t.Fatalf("the re-check branch does not report ALREADY: %s", seg)
 	}
+}
+
+// The two scenarios of the dead branch, run for real in a /bin/sh: the
+// structural tests above read the line; these EXECUTE it. A reversed
+// re-check polarity fails here even though it passes every structural
+// assertion.
+func TestBgCancelCommandFunctionalShell(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX sh")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh on PATH")
+	}
+	// setsid is what makes pgid == pid (the contract the kill relies on).
+	// macOS ships no setsid binary; perl's POSIX::setsid is the portable
+	// stand-in (perl is preinstalled on macOS and setsid exists there).
+	setsid := "setsid"
+	if _, err := exec.LookPath("setsid"); err != nil {
+		perl, err := exec.LookPath("perl")
+		if err != nil {
+			t.Skip("neither setsid nor perl available to create a session leader")
+		}
+		setsid = perl + ` -MPOSIX -e 'POSIX::setsid(); exec @ARGV'`
+	}
+	run := func(script string) string {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, sh, "-c", script).CombinedOutput()
+		if err != nil {
+			t.Fatalf("scenario script failed: %v\n%s", err, out)
+		}
+		return string(out)
+	}
+
+	// Scenario A — a REAL cancel: the job is killed by the group TERM and
+	// never writes .rc. Expect CANCELLED, rc=143, .cancelled stamped. Instead
+	// of a fixed grace sleep, poll until the child is actually its own
+	// process-group leader (pgid == pid) — the contract the group kill
+	// relies on; a fixed sleep raced the setsid on a loaded machine.
+	t.Run("real_cancel_records_143", func(t *testing.T) {
+		job := filepath.Join(t.TempDir(), "job.log")
+		out := run(fmt.Sprintf(`%s sleep 30 > %s 2>&1 < /dev/null &
+echo $! > %s
+i=0
+while [ "$(ps -o pgid= -p $(cat %s) 2>/dev/null | tr -d ' ')" != "$(cat %s)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i+1)); done
+%s
+`, setsid, shellx.Quote(job), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), shellx.Quote(job+".pid"), bgCancelCommand(job)))
+		if !strings.Contains(out, "CANCELLED") || strings.Contains(out, "ALREADY") {
+			t.Fatalf("real cancel must answer CANCELLED (and never ALREADY): %q", out)
+		}
+		if rc, _ := os.ReadFile(job + ".rc"); strings.TrimSpace(string(rc)) != "143" {
+			t.Fatalf("rc marker = %q, want 143", rc)
+		}
+		if _, err := os.Stat(job + ".cancelled"); err != nil {
+			t.Fatalf(".cancelled not stamped: %v", err)
+		}
+	})
+
+	// Scenario B — the natural-finish race: the job ignores TERM, exits 0
+	// and writes its REAL rc during the 5s wait. Expect ALREADY rc=0 and the
+	// marker left untouched (no 143, no .cancelled).
+	t.Run("natural_finish_during_wait_reports_real_rc", func(t *testing.T) {
+		job := filepath.Join(t.TempDir(), "job.log")
+		out := run(fmt.Sprintf(`%s sh -c 'trap "" TERM; sleep 1; echo 0 > "$1.rc"' _ %s > %s 2>&1 < /dev/null &
+echo $! > %s
+sleep 0.5
+%s
+`, setsid, shellx.Quote(job), shellx.Quote(job), shellx.Quote(job+".pid"), bgCancelCommand(job)))
+		if !strings.Contains(out, "ALREADY rc=0") || strings.Contains(out, "CANCELLED") {
+			t.Fatalf("natural finish must answer ALREADY rc=0 (and never CANCELLED): %q", out)
+		}
+		if rc, _ := os.ReadFile(job + ".rc"); strings.TrimSpace(string(rc)) != "0" {
+			t.Fatalf("rc marker = %q, want the real 0 (not overwritten with 143)", rc)
+		}
+		if _, err := os.Stat(job + ".cancelled"); !os.IsNotExist(err) {
+			t.Fatalf(".cancelled must not be stamped on a natural finish: %v", err)
+		}
+	})
 }
 
 // An empty or non-numeric .pid kills NOTHING — the old line reported

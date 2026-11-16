@@ -410,11 +410,15 @@ func bgBytesHint(out string) string {
 //     never write any marker when the target is still alive.
 //   - NATURAL-FINISH RACE: between the opening `[ -f .rc ]` and the 5s
 //     wait, the job may exit on its own and the wrapper may write the REAL
-//     exit code into .rc. Blindy writing 143 there would overwrite a
-//     success with "killed". So the dead-branch re-checks `[ ! -f .rc ]`
-//     BEFORE writing anything: if the marker appeared during the wait, the
-//     answer flips to ALREADY rc=$(cat .rc) — nothing is overwritten, no
-//     .cancelled is stamped.
+//     exit code into .rc. Blindly writing 143 there would overwrite a
+//     success with "killed". So the dead-branch re-checks `[ -f .rc ]`
+//     AFTER the wait, BEFORE writing anything: marker PRESENT ⇒ the job
+//     finished naturally during the wait ⇒ report ALREADY rc=$(cat .rc) —
+//     nothing overwritten, no .cancelled stamped; marker ABSENT ⇒ the group
+//     TERM is what killed it ⇒ write 143 + .cancelled. (⚠️ polarity: the
+//     check is `[ -f`, not `[ ! -f` — a reversed condition makes CANCELLED
+//     unreachable in the real-cancel case AND keeps the overwrite bug in
+//     the natural-finish case; the functional shell test pins both.)
 func bgCancelCommand(path string) string {
 	qrc := shellx.Quote(path + ".rc")
 	qpid := shellx.Quote(path + ".pid")
@@ -426,7 +430,7 @@ func bgCancelCommand(path string) string {
 		"*) kill -TERM \"-$pid\" 2>/dev/null; i=0; "+
 		"while kill -0 \"$pid\" 2>/dev/null && [ $i -lt 25 ]; do sleep 0.2; i=$((i+1)); done; "+
 		"if kill -0 \"$pid\" 2>/dev/null; then echo STILLRUNNING; "+
-		"elif [ ! -f %s ]; then echo ALREADY rc=$(cat %s); "+
+		"elif [ -f %s ]; then echo ALREADY rc=$(cat %s); "+
 		"else echo 143 > %s; echo $(date +%%s) > %s; echo CANCELLED; fi ;; esac; fi",
 		qrc, qrc, qpid, qpid, qrc, qrc, qrc, qcancelled)
 }
