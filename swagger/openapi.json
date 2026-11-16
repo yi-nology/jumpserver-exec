@@ -83,6 +83,29 @@
         },
         "additionalProperties": false
       },
+      "ToolInput_jmsx_bg_cancel": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "asset name or address"
+          },
+          "path": {
+            "type": "string",
+            "description": "the output path returned by jmsx_bg_start"
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "must be true — this kills the background job's whole process group on the machine"
+          }
+        },
+        "required": [
+          "asset",
+          "path",
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
       "ToolInput_jmsx_bg_check": {
         "type": "object",
         "properties": {
@@ -791,6 +814,54 @@
         ],
         "additionalProperties": true
       },
+      "ToolOutput_jmsx_bg_cancel": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exit_code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "risk": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
       "ToolOutput_jmsx_bg_check": {
         "type": "object",
         "properties": {
@@ -903,6 +974,12 @@
             ]
           },
           "blocked": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pid_marker": {
             "type": [
               "null",
               "string"
@@ -3052,6 +3129,21 @@
           }
         ]
       },
+      "ToolResult_jmsx_bg_cancel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvokeResult"
+          },
+          {
+            "properties": {
+              "structured": {
+                "$ref": "#/components/schemas/ToolOutput_jmsx_bg_cancel"
+              }
+            },
+            "type": "object"
+          }
+        ]
+      },
       "ToolResult_jmsx_bg_check": {
         "allOf": [
           {
@@ -3459,9 +3551,68 @@
         "summary": "调用工具 jmsx_audit_query"
       }
     },
+    "/api/v1/tools/jmsx_bg_cancel/invoke": {
+      "post": {
+        "description": "[risk: write] Cancel a background command started with jmsx_bg_start: send SIGTERM to its whole process group (the wrapper shell, the command, and everything it spawned), wait up to 5s for it to exit, and record rc=143. The output file is left in place — read it with jmsx_get_file. Always requires confirm=true. If the job already finished, nothing is touched and its exit code is reported; if it was started before pid markers existed, it cannot be cancelled.（需确认：set confirm=true to kill the background job on the machine）",
+        "operationId": "invoke_jmsx_bg_cancel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolInput_jmsx_bg_cancel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolResult_jmsx_bg_cancel"
+                }
+              }
+            },
+            "description": "调用完成（is_error 说明结果；拒绝、失败与入参不合形状也是 200，与 stdio 应答逐字相同）"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "请求本身坏了（body 不是 JSON 对象 / 读不出 / 太大）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "没有这个工具"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "服务端没能把调用送到工具（会话/传输层故障）"
+          }
+        },
+        "summary": "调用工具 jmsx_bg_cancel"
+      }
+    },
     "/api/v1/tools/jmsx_bg_check/invoke": {
       "post": {
-        "description": "[risk: write] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. Read the output itself with jmsx_get_file. The output and the exit-marker files stay on the asset after the task finishes (they are not removed automatically): pass cleanup=true to have this check remove them once it reports FINISHED — a FINISHED check without cleanup answers with a note saying the files are still there.",
+        "description": "[risk: write] Check whether a background command started with jmsx_bg_start is still running, and whether it has finished. The state is one of running / success / error / cancelled / timeout (the timeout state appears only when JMS_BG_TTL is set and the job outlives it). Read the output itself with jmsx_get_file. The output and the exit-marker files stay on the asset after the task finishes (they are not removed automatically): pass cleanup=true to have this check remove them once it reports a finished state — a finished check without cleanup answers with a note saying the files are still there.",
         "operationId": "invoke_jmsx_bg_check",
         "requestBody": {
           "content": {

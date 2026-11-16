@@ -28,6 +28,7 @@ func RegisterTransferTools(r *reg.Registry, cfg config.Config, mem approvalMemor
 	registerCollectTool(r, cfg, mem)
 	registerBgStartTool(r, cfg, mem)
 	registerBgCheckTool(r, cfg)
+	registerBgCancelTool(r, cfg)
 	registerCollectMultiTool(r, cfg, mem)
 	registerExecMultiTool(r, cfg, mem)
 	registerSessionCostTool(r, cfg)

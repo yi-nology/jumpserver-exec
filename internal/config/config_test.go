@@ -166,6 +166,19 @@ func TestApprovalMemoryTTLIsReadFromTheEnvironment(t *testing.T) {
 	}
 }
 
+// The background job's timeout bound is a setting: it decides when bg_check
+// reports timeout, and the default deployment has NO timeout state (0).
+func TestBgTTLIsReadFromTheEnvironment(t *testing.T) {
+	t.Setenv("JMS_BG_TTL", "")
+	if got := load(t).Koko.BgTTL; got != 0 {
+		t.Errorf("default BgTTL = %v, want 0 (no timeout state)", got)
+	}
+	t.Setenv("JMS_BG_TTL", "7200s")
+	if got := load(t).Koko.BgTTL; got != 7200*time.Second {
+		t.Errorf("BgTTL = %v, want 7200s", got)
+	}
+}
+
 // The key path is written with a tilde by people, and the configuration
 // hands it over as written.
 func TestTheKeyPathExpandsTheTilde(t *testing.T) {

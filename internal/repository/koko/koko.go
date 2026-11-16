@@ -168,6 +168,12 @@ type Config struct {
 	// and is never retried.
 	DialRetries int
 
+	// BgTTL bounds how long a background job (jmsx_bg_start) may run before
+	// bg_check reports it as timeout. 0 disables the timeout state — the
+	// handler-side shell line omits the TIMEOUT branch entirely when this
+	// is zero, so the default deployment has no timeout verdict.
+	BgTTL time.Duration
+
 	// API is the bastion's REST client. The connection-token backend needs it
 	// to resolve the asset and to mint the token; the TUI path does not use
 	// it at all.

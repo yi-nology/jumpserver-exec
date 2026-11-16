@@ -160,6 +160,10 @@ type settings struct {
 	// (kael-style remembered approval). 0 disables the memory.
 	ApprovalMemoryTTL time.Duration `yaml:"approval_memory_ttl" env:"JMS_APPROVAL_MEMORY_TTL" default:"10m"`
 
+	// BgTTL bounds how long a background job may run before bg_check reports it
+	// as timeout. 0 disables the timeout state (the default).
+	BgTTL time.Duration `yaml:"bg_ttl" env:"JMS_BG_TTL" default:"0"`
+
 	// HandshakeTimeout bounds the SSH handshake when a session opens. The
 	// upstream default (5s) suits a datacentre LAN; a VPN/mesh path can
 	// stall longer — measured 1-in-4 session opens timing out on a
@@ -330,6 +334,7 @@ func Load() (Config, error) {
 		Backend:          s.Backend,
 		HandshakeTimeout: s.HandshakeTimeout,
 		DialRetries:      s.DialRetries,
+		BgTTL:            s.BgTTL,
 	}
 	// ⚠️ The koko terminal backend is the one that needs the bastion's
 	// address and the login name; the connection-token backend talks to

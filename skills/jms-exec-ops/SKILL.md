@@ -31,7 +31,7 @@ displayNames:
 | 采集多个事实（要带标签返回） | `jmsx_collect` |
 | 多台机器同一条命令 | `jmsx_exec_multi`（默认并发 4） |
 | 多台机器采同一组事实 | `jmsx_collect_multi`（矩阵：行=机器，列=事实） |
-| 超过 10 分钟的长任务 | `jmsx_bg_start` + `jmsx_bg_check` + `jmsx_get_file` |
+| 超过 10 分钟的长任务 | `jmsx_bg_start` + `jmsx_bg_check` + `jmsx_get_file`；要中止用 `jmsx_bg_cancel`（无条件 `confirm=true`，杀整个进程组） |
 | 上传文件 | `jmsx_put_file`；整目录用 `jmsx_put_dir`（tar 流） |
 | 下载文件 / 只取一段 | `jmsx_get_file`（`offset` / `length`） |
 | **下载整个目录** | `jmsx_get_dir`（tar 流，与 `jmsx_put_dir` 对称） |
@@ -186,15 +186,22 @@ jmsx_bg_start {"asset":"192.0.2.71","command":"./deploy.sh","path":"/tmp/deploy.
 jmsx_bg_check {"asset":"192.0.2.71","path":"/tmp/deploy.log"}
 # → 跑完后垃圾还在线上；读完输出带 cleanup=true + confirm=true 一次清掉
 jmsx_bg_check {"asset":"192.0.2.71","path":"/tmp/deploy.log","cleanup":true,"confirm":true}
-# → {"state":"running"} 或 {"state":"finished","exit_code":0}
+# → {"state":"running"} / {"state":"success","exit_code":0} / {"state":"error","exit_code":3}
+#   / {"state":"cancelled","exit_code":"143"} / {"state":"timeout"}（仅配了 JMS_BG_TTL 时才有 timeout）
+
+# 中止（杀整个进程组；无条件要 confirm=true）
+jmsx_bg_cancel {"asset":"192.0.2.71","path":"/tmp/deploy.log","confirm":true}
+# → {"state":"cancelled"} / already_finished（没动它的 .rc）/ no_marker（老任务）/ still_running
 
 # 读输出
 jmsx_get_file {"asset":"192.0.2.71","remote_path":"/tmp/deploy.log"}
 ```
 
 进程是**脱离会话**的（`setsid`），所以堡垒机关掉连接不会杀掉它。
-退出码写在 `.rc` 标记文件里，**靠它区分「还在跑」和「跑完了」** ——
-光看输出文件存在是判断不出来的。
+标记文件写在输出旁边：`.rc` 退出码、`.pid` 进程号（取消靠它杀整组）、
+`.started` 启动时间戳（`JMS_BG_TTL` 超时判定的钟）。状态是五态：
+**running / success / error / cancelled / timeout**——`finished` 这个词已经没了，
+`bg_check` 按 `.rc` 里的退出码区分 success（0）和 error（非 0）。
 
 ---
 

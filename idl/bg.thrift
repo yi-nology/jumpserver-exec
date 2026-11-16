@@ -28,13 +28,16 @@ struct BgStartResult {
   8: optional string risk,
   /** 为什么没跑。 */
   9: optional string blocked,
+  /** 后台进程的 pid 标记（setsid 后该 pid 即进程组组长；jmsx_bg_cancel 靠它整组终止）。 */
+  10: optional string pid_marker,
 }
 
 /**
  * 一个后台命令的状态（jmsx_bg_check）。
  *
- * state 是 running 还是 finished；finished 时 exit_code 是命令的退出码
- * （字符串，因为它是从机器上的标记文件里读出来的）。
+ * state：running / success / error / cancelled / timeout（kael 五态）；
+ * success/error 时 exit_code 是命令的退出码（字符串，因为它是从机器上的
+ * 标记文件里读出来的）。
  *
  * 清理策略（#19）：输出与退出码文件不自动清——RUNNING 时它们正被任务
  * 写着，删了会丢输出；FINISHED 后由调用方显式带 cleanup=true 清理。
@@ -44,7 +47,7 @@ struct BgCheckResult {
   1: optional string asset,
   /** 输出文件的路径。 */
   2: optional string path,
-  /** running / finished。 */
+  /** running / success / error / cancelled / timeout（kael 五态）。 */
   3: optional string state,
   /** 退出码（跑完了才有）。 */
   4: optional string exit_code,
@@ -58,4 +61,21 @@ struct BgCheckResult {
   8: optional string risk,
   /** 为什么没跑（cleanup 没带 confirm 时的拒答语）。 */
   9: optional string blocked,
+}
+
+/**
+ * 一次后台命令的取消回执（jmsx_bg_cancel）。
+ *
+ * state：cancelled（已终止并落 143 与 .cancelled 标记）/
+ * already_finished（任务早已结束，未动它的 .rc）/ no_marker（没有 pid 标记，
+ * 老任务不支持取消）/ still_running（TERM 后 5s 内仍未退出，未确认死亡）。
+ */
+struct BgCancelResult {
+  1: optional string asset,
+  2: optional string path,
+  3: optional string state,
+  4: optional string exit_code,
+  5: optional string note,
+  6: optional string risk,
+  7: optional string blocked,
 }

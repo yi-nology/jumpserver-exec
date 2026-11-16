@@ -16,6 +16,7 @@ type BgStartResult struct {
 	Note       *string `thrift:"note,7,optional" json:"note,omitempty"`
 	Risk       *string `thrift:"risk,8,optional" json:"risk,omitempty"`
 	Blocked    *string `thrift:"blocked,9,optional" json:"blocked,omitempty"`
+	PidMarker  *string `thrift:"pid_marker,10,optional" json:"pid_marker,omitempty"`
 }
 
 func NewBgStartResult() *BgStartResult {
@@ -106,6 +107,15 @@ func (p *BgStartResult) GetBlocked() (v string) {
 	return *p.Blocked
 }
 
+var BgStartResult_PidMarker_DEFAULT string
+
+func (p *BgStartResult) GetPidMarker() (v string) {
+	if !p.IsSetPidMarker() {
+		return BgStartResult_PidMarker_DEFAULT
+	}
+	return *p.PidMarker
+}
+
 func (p *BgStartResult) IsSetAsset() bool {
 	return p.Asset != nil
 }
@@ -140,6 +150,10 @@ func (p *BgStartResult) IsSetRisk() bool {
 
 func (p *BgStartResult) IsSetBlocked() bool {
 	return p.Blocked != nil
+}
+
+func (p *BgStartResult) IsSetPidMarker() bool {
+	return p.PidMarker != nil
 }
 
 func (p *BgStartResult) String() string {
@@ -290,4 +304,119 @@ func (p *BgCheckResult) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("BgCheckResult(%+v)", *p)
+}
+
+type BgCancelResult struct {
+	Asset    *string `thrift:"asset,1,optional" json:"asset,omitempty"`
+	Path     *string `thrift:"path,2,optional" json:"path,omitempty"`
+	State    *string `thrift:"state,3,optional" json:"state,omitempty"`
+	ExitCode *string `thrift:"exit_code,4,optional" json:"exit_code,omitempty"`
+	Note     *string `thrift:"note,5,optional" json:"note,omitempty"`
+	Risk     *string `thrift:"risk,6,optional" json:"risk,omitempty"`
+	Blocked  *string `thrift:"blocked,7,optional" json:"blocked,omitempty"`
+}
+
+func NewBgCancelResult() *BgCancelResult {
+	return &BgCancelResult{}
+}
+
+func (p *BgCancelResult) InitDefault() {
+}
+
+var BgCancelResult_Asset_DEFAULT string
+
+func (p *BgCancelResult) GetAsset() (v string) {
+	if !p.IsSetAsset() {
+		return BgCancelResult_Asset_DEFAULT
+	}
+	return *p.Asset
+}
+
+var BgCancelResult_Path_DEFAULT string
+
+func (p *BgCancelResult) GetPath() (v string) {
+	if !p.IsSetPath() {
+		return BgCancelResult_Path_DEFAULT
+	}
+	return *p.Path
+}
+
+var BgCancelResult_State_DEFAULT string
+
+func (p *BgCancelResult) GetState() (v string) {
+	if !p.IsSetState() {
+		return BgCancelResult_State_DEFAULT
+	}
+	return *p.State
+}
+
+var BgCancelResult_ExitCode_DEFAULT string
+
+func (p *BgCancelResult) GetExitCode() (v string) {
+	if !p.IsSetExitCode() {
+		return BgCancelResult_ExitCode_DEFAULT
+	}
+	return *p.ExitCode
+}
+
+var BgCancelResult_Note_DEFAULT string
+
+func (p *BgCancelResult) GetNote() (v string) {
+	if !p.IsSetNote() {
+		return BgCancelResult_Note_DEFAULT
+	}
+	return *p.Note
+}
+
+var BgCancelResult_Risk_DEFAULT string
+
+func (p *BgCancelResult) GetRisk() (v string) {
+	if !p.IsSetRisk() {
+		return BgCancelResult_Risk_DEFAULT
+	}
+	return *p.Risk
+}
+
+var BgCancelResult_Blocked_DEFAULT string
+
+func (p *BgCancelResult) GetBlocked() (v string) {
+	if !p.IsSetBlocked() {
+		return BgCancelResult_Blocked_DEFAULT
+	}
+	return *p.Blocked
+}
+
+func (p *BgCancelResult) IsSetAsset() bool {
+	return p.Asset != nil
+}
+
+func (p *BgCancelResult) IsSetPath() bool {
+	return p.Path != nil
+}
+
+func (p *BgCancelResult) IsSetState() bool {
+	return p.State != nil
+}
+
+func (p *BgCancelResult) IsSetExitCode() bool {
+	return p.ExitCode != nil
+}
+
+func (p *BgCancelResult) IsSetNote() bool {
+	return p.Note != nil
+}
+
+func (p *BgCancelResult) IsSetRisk() bool {
+	return p.Risk != nil
+}
+
+func (p *BgCancelResult) IsSetBlocked() bool {
+	return p.Blocked != nil
+}
+
+func (p *BgCancelResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("BgCancelResult(%+v)", *p)
 }

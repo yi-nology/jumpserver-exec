@@ -57,6 +57,10 @@ var Table = reg.PolicyTable{
 		Hint: "confirm=true only when one of the commands is classified DANGEROUS"},
 	"jmsx_bg_start": {Risk: jms.Risk_write, Conditional: true,
 		Hint: "confirm=true only when the command is classified DANGEROUS"},
+	// 取消是杀目标机器上的整个进程组——是写不是读，且无条件（不像
+	// bg_start 看命令分类）：任何时候杀进程都要显式确认，与 put_file 同档。
+	"jmsx_bg_cancel": {Risk: jms.Risk_write,
+		Confirm: "set confirm=true to kill the background job on the machine"},
 	"jmsx_put_file": {Risk: jms.Risk_destructive,
 		Confirm: "set confirm=true to write a file on the machine"},
 	// A directory upload overwrites same-name files on the machine, so it
