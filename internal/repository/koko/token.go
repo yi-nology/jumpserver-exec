@@ -478,6 +478,10 @@ func (t *tokenBackend) run(command string, stdin io.Reader, stdout, stderr io.Wr
 			// more, and the command may still be running on the asset.
 			t.conn.broken.Store(true)
 		}
+		// Text callers get the richer shape: runText replaces this error with
+		// timeoutWithOutput (execution_state_unknown + the output tail). This
+		// sentinel text is what byte-stream callers (transfers, tar pipes)
+		// still carry.
 		return -1, fmt.Errorf(
 			"the command on %s did not finish within %s: %w", t.asset, timeout, ErrCommandTimeout)
 	}
