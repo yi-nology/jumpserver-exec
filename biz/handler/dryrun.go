@@ -62,6 +62,10 @@ func rehearsalM(mem approvalMemory, asset, command string, class jms.CommandClas
 			if dryRun {
 				note = fmt.Sprintf("dangerous command confirmed; a real run would remember this approval for %s (dry run: nothing granted)", mem.TTL())
 			} else {
+				// 授予时机是有意的：confirm 是调用方的显式意图，记忆记的是
+				// 「这条命令在这台资产上被授权过」，不是「它被执行过」——所以
+				// 会话没开起来（OpenSession 失败返回 fail(err)）同样记：授权的
+				// 这一事实已成立，下次同一调用凭记忆免确认；免的是确认，不是留痕。
 				mem.Grant(asset, command)
 				note = fmt.Sprintf("dangerous command confirmed and remembered; this exact command on this asset needs no further confirmation for %s", mem.TTL())
 			}

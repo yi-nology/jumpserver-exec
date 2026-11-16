@@ -73,8 +73,8 @@ python3 script/publish-mcp.py
 6. **工具描述要写「什么时候用这个工具」**，不是「这个工具做什么」——
    那是 AI 选工具的唯一依据；
 7. **同步改 `skills/`** —— 那里是 agent 选工具的依据；
-8. **改工具数**（15 → 16）—— 被 `internal/service/policy/policy_test.go` 钉住
-   （⚠️ 没有 REST 凭据时那个数是 14）。
+8. **改工具数**（现口径 19 → 20）—— 被 `internal/service/policy/policy_test.go` 钉住
+   （⚠️ 没有 REST 凭据时那个数是 18）。
 
 ⚠️ **动了会话层就要想清楚投递状态**：改「命令怎么发出去」或「失败怎么分类」时，
 必须重看 [`../AGENTS.md`](../AGENTS.md) §1 第 1 条 ——

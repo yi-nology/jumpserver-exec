@@ -164,7 +164,7 @@ jumpserver-exec --doctor   # 接线 + 真实 koko 登录验证
 | **HTTP 面** | REST 与 MCP over HTTP **共用同一个注册表** ⇒ 同一道门禁、同一套确认、同一份留痕；除 `/api/v1/health` 外全部要 Bearer 令牌（常量时间比较），没有「不开认证」模式 | `pkg/httpapi`（底座） |
 | **RPC 面** | kitex/thrift 第三张脸，同一注册表同一扇门：拒绝是 is_error **答案**、token 错是**传输错误**；无匿名（目录也认证） | `pkg/rpcapi` + `pkg/faces`（底座） |
 | **审批记忆** | 同一台资产上**同一条命令**的 `confirm=true` 在 `JMS_APPROVAL_MEMORY_TTL`（默认 10m）窗口内可复用 —— 免确认但**不免留痕**：命中与授予都写进答复的 `note`；`dry_run` 排练不授予（`0` 关闭） | `pkg/reg`（底座） |
-| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试；超时回执带部分输出（`execution_state_unknown` + 4KiB 尾部），不猜、不装成功 | `biz/handler` |
+| **投递状态** | 失败时区分「命令**没送到**机器」与「**可能还在机器上跑着**」—— 后者绝不重试；超时回执带部分输出（`execution_state_unknown` + 4KiB 尾部，连接令牌后端专属；TUI 兜底路径仍是 `maybe_sent` + 400 字节屏幕尾），不猜、不装成功 | `biz/handler` |
 
 > 上面三个 `pkg/*` 现在住在
 > [`jumpserver-kit`](https://github.com/yi-nology/jumpserver-kit) —— 它们是两个服务

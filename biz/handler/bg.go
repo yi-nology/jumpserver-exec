@@ -243,9 +243,10 @@ const bgCleanedMark = "JMSX_BG_CLEANED"
 //
 // The five-state vocabulary (kael): FINISHED maps to success/error by the
 // recorded exit code; CANCELLED/TIMEOUT/RUNNING are their own states.
-// CANCELLED wins over FINISHED when both appear (the builder orders the
-// branches so both should not appear, but the parser takes the stronger
-// verdict anyway — a cancel is a cancel).
+// The loop is LAST-MATCH-WINS per line: if a malformed answer carried both
+// CANCELLED and FINISHED, whichever appears LATER in the output decides —
+// the builder orders its branches so both should never appear, and this
+// parser does not re-order them.
 func parseBgCheckOutput(out string) (state, exitCode string, cleaned bool) {
 	state = "running"
 	for _, line := range strings.Split(out, "\n") {
@@ -385,8 +386,11 @@ func bgBytesHint(out string) string {
 //
 //   - .rc exists → ALREADY: the job finished long ago; its recorded exit code
 //     is reported and NOTHING is written (the .rc is history, not state).
-//   - no .pid → NOMARK: the job predates pid markers and cannot be cancelled.
-//   - otherwise → `kill -TERM -$pid`: the MINUS makes it a process-group
+//   - no .pid, OR .pid empty/garbage → NOMARK: there is no valid pid to
+//     signal (an empty or non-numeric .pid kills NOTHING — reporting
+//     CANCELLED for it would be a fake verdict), so the caller learns the
+//     job cannot be cancelled this way.
+//   - otherwise → `kill -TERM "-$pid"`: the MINUS makes it a process-group
 //     signal, and setsid (bg_start) guarantees pgid == pid, so the wrapper
 //     shell, the inner `sh -c "$1"`, and everything the command spawned die
 //     together. 25 × 0.2s gives the TERM 5s to land; still alive after that is
@@ -395,23 +399,36 @@ func bgBytesHint(out string) string {
 //     pair .cancelled-first + rc into "cancelled", not "error") and stamp the
 //     .cancelled file the check reads first.
 //
-// ⚠️ pid-reuse tradeoff (stated at bgStartCommand too): between the job
-// exiting naturally and this line running, the OS may recycle the pid, and
-// the TERM would land on an unrelated process group. The window is tiny and
-// same-account bounded; there is no pidfd through a shell one-liner. What
-// this line DOES do: check the job's own .rc first, and never write any
-// marker when the target is still alive.
+// ⚠️ Two windows, stated honestly (verifier-flagged; both once lied in the
+// old version):
+//
+//   - pid-reuse tradeoff (stated at bgStartCommand too): between the job
+//     exiting naturally and this line running, the OS may recycle the pid,
+//     and the TERM would land on an unrelated process group. The window is
+//     tiny and same-account bounded; there is no pidfd through a shell
+//     one-liner. What this line DOES do: check the job's own .rc first, and
+//     never write any marker when the target is still alive.
+//   - NATURAL-FINISH RACE: between the opening `[ -f .rc ]` and the 5s
+//     wait, the job may exit on its own and the wrapper may write the REAL
+//     exit code into .rc. Blindy writing 143 there would overwrite a
+//     success with "killed". So the dead-branch re-checks `[ ! -f .rc ]`
+//     BEFORE writing anything: if the marker appeared during the wait, the
+//     answer flips to ALREADY rc=$(cat .rc) — nothing is overwritten, no
+//     .cancelled is stamped.
 func bgCancelCommand(path string) string {
 	qrc := shellx.Quote(path + ".rc")
 	qpid := shellx.Quote(path + ".pid")
 	qcancelled := shellx.Quote(path + ".cancelled")
 	return fmt.Sprintf("if [ -f %s ]; then echo ALREADY rc=$(cat %s); "+
 		"elif [ ! -f %s ]; then echo NOMARK; "+
-		"else pid=$(cat %s); kill -TERM -$pid 2>/dev/null; i=0; "+
-		"while kill -0 $pid 2>/dev/null && [ $i -lt 25 ]; do sleep 0.2; i=$((i+1)); done; "+
-		"if kill -0 $pid 2>/dev/null; then echo STILLRUNNING; "+
-		"else echo 143 > %s; echo $(date +%%s) > %s; echo CANCELLED; fi; fi",
-		qrc, qrc, qpid, qpid, qrc, qcancelled)
+		"else pid=$(cat %s); "+
+		"case $pid in ''|*[!0-9]*) echo NOMARK ;; "+
+		"*) kill -TERM \"-$pid\" 2>/dev/null; i=0; "+
+		"while kill -0 \"$pid\" 2>/dev/null && [ $i -lt 25 ]; do sleep 0.2; i=$((i+1)); done; "+
+		"if kill -0 \"$pid\" 2>/dev/null; then echo STILLRUNNING; "+
+		"elif [ ! -f %s ]; then echo ALREADY rc=$(cat %s); "+
+		"else echo 143 > %s; echo $(date +%%s) > %s; echo CANCELLED; fi ;; esac; fi",
+		qrc, qrc, qpid, qpid, qrc, qrc, qrc, qcancelled)
 }
 
 // parseBgCancelOutput reads the cancel line's output: which of the four

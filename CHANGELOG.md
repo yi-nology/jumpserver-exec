@@ -24,6 +24,7 @@
 - **超时回执带部分输出**（借鉴 kael 回执超时）：命令撞上工具超时时，
   答复是 `execution_state_unknown` + 已产出输出的 4KiB 尾部 —— 不猜、不装成功；
   `maybe_sent` 分类不变（可能还在机器上跑着的仍绝不重放）。
+  ⚠️ **连接令牌后端专属**：TUI 兜底路径仍是旧形状（`maybe_sent` + 400 字节屏幕尾）。
 - 新环境变量 `JMS_APPROVAL_MEMORY_TTL`（默认 10m，`0` 关闭）与 `JMS_BG_TTL`
   （默认 `0` 不启用；需 `>=1s` 才有效，亚秒值截断为 0 会立即 timeout）。
 

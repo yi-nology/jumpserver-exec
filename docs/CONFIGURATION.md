@@ -22,7 +22,7 @@
        ┌──────────────────┐         ┌────────┴─────────┐
        │ jumpserver-mgmt-  │  SSH    │  受管机器          │
        │ exec (本服务,    ├────────►│  (录像可审计)      │
-       │ 15 工具)          │         │                   │
+       │ 19 工具)          │         │                   │
        └──────────────────┘         └───────────────────┘
 ```
 
@@ -488,7 +488,7 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 | 每次会话都慢十倍 | `--doctor` 的 `version` | 委派在 v4 上回 401 ⇒ 被读成「令牌机制不可用」 |
 | env 值带首尾空白 | 直接可用 | confload 统一裁掉（Token 尾随空格不再漏进 Authorization 头，枚举字段带空白不再拒载） |
 | `jmsx_exec` 返回空 | 看 `exit_code` 和 `truncated` | `exit_code=-1` = 未知（命令杀了 shell），改用 `sh -c '...'` 包一层；`truncated=true` = 开头被截掉了 |
-| `jmsx_inventory` 不见了 | 有没有 `JUMPSERVER_TOKEN` | 没 REST 凭据时**它不注册** ⇒ 工具数是 14 不是 15 |
+| `jmsx_inventory` 不见了 | 有没有 `JUMPSERVER_TOKEN` | 没 REST 凭据时**它不注册** ⇒ 工具数是 18 不是 19 |
 | 输出少了 40 行 | 走的是哪条路 | **终端兜底路径**的窗格只有约 40 行；令牌路径是完整的 |
 | MCP 进程 exit 137 / 无 stderr | 换一个**新路径** | 受执行策略限制的环境里，覆盖已存在路径的二进制会被杀 |
 | `replacement directory ... does not exist` | `./script/restore-go-modcache.sh` | Go module cache 被清空 |
@@ -515,8 +515,8 @@ host 或 user 没配时它的严重度分三档 —— 令牌后端不需要它�
 > ⚠️ 发布必须进**新的时间戳目录**。在某些受执行策略限制的环境里，原地覆盖二进制会被杀
 > （exit 137、无 stderr）。`publish-mcp.py` 已经这么做了，不要自己写 `cp` 覆盖。
 
-改完记得看工具数：执行面加一个工具应该 **N+1**（15 → 16）。没变说明注册表漏了。
-⚠️ **没有 REST 凭据时那个数是 14**（`jmsx_inventory` 不注册）。
+改完记得看工具数：执行面加一个工具应该 **N+1**（现口径 19 → 20）。没变说明注册表漏了。
+⚠️ **没有 REST 凭据时那个数是 18**（`jmsx_inventory` 不注册）。
 
 > 开发环境的完整流程、验证要求与常见坑见 [`DEVELOPMENT.md`](DEVELOPMENT.md)。
 

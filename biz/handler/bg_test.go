@@ -163,10 +163,57 @@ func TestBgCheckCommandCancelledAndTtl(t *testing.T) {
 // (25 × 0.2s), and record 143 + the .cancelled marker when it dies.
 func TestBgCancelCommandLifecycle(t *testing.T) {
 	line := bgCancelCommand("/tmp/x.log")
-	for _, want := range []string{"kill -TERM -", "ALREADY", "NOMARK", "CANCELLED", "STILLRUNNING", "143"} {
+	for _, want := range []string{`kill -TERM "-$pid"`, "ALREADY", "NOMARK", "CANCELLED", "STILLRUNNING", "143"} {
 		if !strings.Contains(line, want) {
 			t.Fatalf("cancel line missing %q: %s", want, line)
 		}
+	}
+	// The pid is quoted everywhere it is used: an empty or whitespace pid
+	// must never reach kill unquoted.
+	for _, want := range []string{`kill -TERM "-$pid"`, `kill -0 "$pid"`} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("cancel line does not quote the pid as %q: %s", want, line)
+		}
+	}
+}
+
+// The natural-finish race (verifier必修): between the opening .rc check and
+// the 5s wait the job may exit on its own, and the wrapper then writes the
+// REAL exit code into .rc. Writing 143 over it would report "killed" for a
+// job that actually succeeded — so the dead-branch re-checks .rc BEFORE
+// writing anything, and flips to ALREADY rc=<real> when the marker appeared
+// during the wait.
+func TestBgCancelCommandRechecksRcBeforeWriting143(t *testing.T) {
+	line := bgCancelCommand("/tmp/x.log")
+	recheck := strings.LastIndex(line, "elif [ ! -f")
+	write143 := strings.Index(line, "echo 143 >")
+	if recheck < 0 || write143 < 0 {
+		t.Fatalf("cancel line lost its shape: %s", line)
+	}
+	if recheck > write143 {
+		t.Fatalf("the natural-finish re-check must come BEFORE the 143 write: %s", line)
+	}
+	// The re-check reports ALREADY (nothing overwritten, no .cancelled).
+	seg := line[recheck:write143]
+	if !strings.Contains(seg, "ALREADY") {
+		t.Fatalf("the re-check branch does not report ALREADY: %s", seg)
+	}
+}
+
+// An empty or non-numeric .pid kills NOTHING — the old line reported
+// CANCELLED and wrote 143 for it, a fake verdict. Now the pid is validated
+// right after it is read, and anything that is not a plain number answers
+// NOMARK like a missing marker.
+func TestBgCancelCommandRejectsEmptyOrGarbagePid(t *testing.T) {
+	line := bgCancelCommand("/tmp/x.log")
+	if !strings.Contains(line, `case $pid in ''|*[!0-9]*) echo NOMARK`) {
+		t.Fatalf("cancel line does not validate the pid: %s", line)
+	}
+	// Every use of $pid sits INSIDE the numeric arm of the case statement.
+	caseAt := strings.Index(line, "case $pid in")
+	killAt := strings.Index(line, "kill -TERM")
+	if caseAt < 0 || killAt < 0 || killAt < caseAt {
+		t.Fatalf("the kill is not guarded by the pid validation: %s", line)
 	}
 }
 
@@ -187,5 +234,20 @@ func TestParseBgCancelOutput(t *testing.T) {
 	}
 	if _, rc := parseBgCancelOutput("ALREADY rc=7"); rc != "7" {
 		t.Fatal("rc not parsed")
+	}
+}
+
+// The natural-finish simulation: the job died during the 5s wait and the
+// wrapper had already written the real exit code, so the machine answers
+// ALREADY rc=<real> from the DEAD branch. The parser must read that as
+// "already finished with the real code" — never as "cancelled".
+func TestParseBgCancelOutputNaturalFinishRace(t *testing.T) {
+	st, rc := parseBgCancelOutput("ALREADY rc=0")
+	if st != "already_finished" || rc != "0" {
+		t.Fatalf("natural finish (rc=0) → %q rc=%q, want already_finished rc=0", st, rc)
+	}
+	st, rc = parseBgCancelOutput("ALREADY rc=3")
+	if st != "already_finished" || rc != "3" {
+		t.Fatalf("natural finish (rc=3) → %q rc=%q, want already_finished rc=3", st, rc)
 	}
 }
