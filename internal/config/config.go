@@ -171,9 +171,9 @@ type settings struct {
 	HandshakeTimeout time.Duration `yaml:"koko_handshake_timeout" env:"JMS_KOKO_HANDSHAKE_TIMEOUT" default:"15s"`
 
 	// DialRetries is how many times a handshake-class session-open failure
-	// is retried (default 1). Only handshake failures retry — nothing was
-	// delivered, so the never-replay rule does not apply; auth refusals
-	// are verdicts and are never retried.
+	// is retried (default 1). 0 disables the redial. Only handshake failures
+	// retry — nothing was delivered, so the never-replay rule does not apply;
+	// auth refusals are verdicts and are never retried.
 	DialRetries int `yaml:"koko_dial_retries" env:"JMS_KOKO_DIAL_RETRIES" default:"1"`
 
 	// ReadOnly refuses every tool that changes the machine.

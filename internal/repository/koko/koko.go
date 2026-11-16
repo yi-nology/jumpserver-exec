@@ -217,30 +217,53 @@ type Config struct {
 	Memory *BackendMemory
 }
 
-// dialWithHandshakeRetry dials once, and again on handshake-class failures
-// up to cfg.DialRetries times (default one retry). Only the handshake
-// retries: the connection never came up, so nothing was ever delivered and
-// the never-replay rule does not apply to a dial that delivered nothing. An
-// auth refusal or a channel-open error is a verdict, not a blip, and is
-// never retried.
+// dialWithHandshakeRetry dials within the budget, redialing handshake-timeout
+// blips up to cfg.DialRetries times (default one retry). The retry LOOP lives
+// in sshx.DialWithPolicy now (network#125 absorbed this shape — budget shared
+// across attempts, never amplified by the redial); what stays here is the
+// POLICY: only a handshake timeout retries, because the connection never came
+// up — nothing was delivered, so the never-replay rule does not apply to a
+// dial that delivered nothing. An auth refusal is a verdict, not a blip, and
+// is never retried: the default Retryable recognises only the typed timeout
+// sentinel (network#116 absorbed the judgement after the old wording matcher
+// silently redialled refusals).
 func dialWithHandshakeRetry(ctx context.Context, addr string, cc *ssh.ClientConfig,
 	timeout time.Duration, cfg Config) (*ssh.Client, error) {
-	handshake := cfg.HandshakeTimeout
-	if handshake <= 0 {
-		handshake = 15 * time.Second // 实测：tailscale 链路 5s 内 1/4 会话开超时
+	opts := sshx.DialOptions{Budget: timeout, Handshake: handshakeTimeoutOf(cfg)}
+	if redialOff(cfg) {
+		// 0 = 关掉重拨：旁路 DialWithPolicy 直连。⚠️ 不能把这个值交给
+		// policy —— 上游把 Retries<=0 读作「默认 1」，0 的语义会被吃掉
+		//（收编审阅 verifier 发现；旧手写循环里 0 就是不重拨）。
+		return sshx.Dial(ctx, addr, cc, opts)
 	}
-	retries := cfg.DialRetries
-	if retries < 0 {
-		retries = 0
+	return sshx.DialWithPolicy(ctx, addr, cc, opts, dialPolicyOf(cfg))
+}
+
+// handshakeTimeoutOf bounds the SSH handshake on session open. The upstream
+// default (5s) suits a datacentre LAN; a VPN/mesh path can stall longer —
+// measured 1-in-4 session opens timing out on a tailscale path at 5s.
+func handshakeTimeoutOf(cfg Config) time.Duration {
+	if cfg.HandshakeTimeout > 0 {
+		return cfg.HandshakeTimeout
 	}
-	var client *ssh.Client
-	var err error
-	for attempt := 0; ; attempt++ {
-		client, err = sshx.Dial(ctx, addr, cc, sshx.DialOptions{Budget: timeout, Handshake: handshake})
-		if err == nil || !isHandshakeFailure(err) || attempt >= retries {
-			return client, err
-		}
-	}
+	return 15 * time.Second
+}
+
+// dialPolicyOf is the retry side of the dial. Retryable stays NIL on purpose:
+// the sshx default retries ONLY ErrHandshakeTimeout, so an auth refusal (a
+// verdict about the credential) can never be redialled. The test pins this
+// contract — do not add a Retryable here without re-reading the
+// verdict-not-blip rule above.
+//
+// 前提：redialOff(cfg) == false —— 0/负值在 dialWithHandshakeRetry 里旁路，
+// 不到这里（上游会把 <=0 提升为默认 1 次重拨）。
+func dialPolicyOf(cfg Config) sshx.DialPolicy {
+	return sshx.DialPolicy{Retries: cfg.DialRetries}
+}
+
+// redialOff says the config asked for NO redial (DialRetries 0 or negative).
+func redialOff(cfg Config) bool {
+	return cfg.DialRetries <= 0
 }
 
 func (c Config) address() string {

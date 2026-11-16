@@ -71,10 +71,6 @@ func Sha256Prefix(b []byte) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-// sessionChunk is the single-use transfer token written next to the temp file,
-// so a second process cannot collide on it and so the marker is verifiable.
-const sessionChunkTag = "__JMSX_CHUNK_"
-
 type TransferResult struct {
 	Asset      string
 	LocalPath  string
