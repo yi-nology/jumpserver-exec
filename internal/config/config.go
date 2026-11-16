@@ -37,6 +37,11 @@ type Config struct {
 	// to turn when an agent should look at the fleet but not touch it.
 	ReadOnly bool
 
+	// ApprovalMemoryTTL is how long a confirm=true on a dangerous command
+	// stays reusable for the identical command on the identical asset
+	// (kael-style remembered approval). 0 disables the memory.
+	ApprovalMemoryTTL time.Duration
+
 	// CredentialDedicated says whether the REST credential came from THIS
 	// plane's own slot (JUMPSERVER_EXEC_TOKEN) rather than the shared
 	// JUMPSERVER_TOKEN. It is what the doctor's `credential` row reports on:
@@ -149,6 +154,11 @@ type settings struct {
 	// how long a revoked right stays effective, because a pooled
 	// connection carries the authority it was minted with.
 	PoolTTL time.Duration `yaml:"pool_ttl" env:"JMS_POOL_TTL" default:"2m"`
+
+	// ApprovalMemoryTTL is how long a confirm=true on a dangerous command
+	// stays reusable for the identical command on the identical asset
+	// (kael-style remembered approval). 0 disables the memory.
+	ApprovalMemoryTTL time.Duration `yaml:"approval_memory_ttl" env:"JMS_APPROVAL_MEMORY_TTL" default:"10m"`
 
 	// HandshakeTimeout bounds the SSH handshake when a session opens. The
 	// upstream default (5s) suits a datacentre LAN; a VPN/mesh path can
@@ -268,7 +278,8 @@ func Load() (Config, error) {
 	}
 
 	cfg := Config{
-		ReadOnly: s.ReadOnly,
+		ReadOnly:          s.ReadOnly,
+		ApprovalMemoryTTL: s.ApprovalMemoryTTL,
 		// The credential's provenance rides beside the credential itself:
 		// the doctor reports the structural gap (shared vs dedicated) and
 		// cannot work it out from the merged value alone.

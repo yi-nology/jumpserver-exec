@@ -152,6 +152,20 @@ func TestThePoolWindowIsReadFromTheEnvironment(t *testing.T) {
 	}
 }
 
+// The approval memory's window is a setting like the pool's: it decides how
+// long a confirm=true on a dangerous command stays reusable, so it has to be
+// adjustable without a rebuild (0 disables the memory).
+func TestApprovalMemoryTTLIsReadFromTheEnvironment(t *testing.T) {
+	t.Setenv("JMS_APPROVAL_MEMORY_TTL", "")
+	if got := load(t).ApprovalMemoryTTL; got != 10*time.Minute {
+		t.Errorf("default ApprovalMemoryTTL = %v, want 10m", got)
+	}
+	t.Setenv("JMS_APPROVAL_MEMORY_TTL", "90s")
+	if got := load(t).ApprovalMemoryTTL; got != 90*time.Second {
+		t.Errorf("ApprovalMemoryTTL = %v, want 90s", got)
+	}
+}
+
 // The key path is written with a tilde by people, and the configuration
 // hands it over as written.
 func TestTheKeyPathExpandsTheTilde(t *testing.T) {

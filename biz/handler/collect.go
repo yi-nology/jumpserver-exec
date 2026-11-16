@@ -6,6 +6,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -115,7 +116,7 @@ func collectClass(checks []collectCheck) jms.CommandClass {
 // The command is the caller's own, which is why the collect tools are
 // classified like command runners rather than like readers.
 
-func registerCollectTool(r *reg.Registry, cfg config.Config) {
+func registerCollectTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 
 	type collectArgs struct {
 		Asset   string         `json:"asset" jsonschema:"asset name or address"`
@@ -144,7 +145,9 @@ func registerCollectTool(r *reg.Registry, cfg config.Config) {
 			Asset:  args.Asset,
 			Checks: checkList(args.Checks),
 		}
-		riskClass, would, blocked := rehearsal(class, args.Confirm)
+		// The check list is the memory key: a remembered approval covers
+		// exactly these commands on this asset, in this order.
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			return render.Text(res)
@@ -163,6 +166,11 @@ func registerCollectTool(r *reg.Registry, cfg config.Config) {
 		outputs, runErr := s.Exec(checkCommands(args.Checks), timeout)
 		res.Facts = factMap(args.Checks, outputs)
 		res.Stats = s.Stats()
+		// Why the gate let a dangerous check list through. The trail reads
+		// this.
+		if note != "" {
+			res.Note = jms.Opt(note)
+		}
 		if runErr != nil {
 			res.Partial = jms.OptBool(true)
 			// How far the commands got. The trail asks "what may still be
@@ -176,7 +184,7 @@ func registerCollectTool(r *reg.Registry, cfg config.Config) {
 
 }
 
-func registerCollectMultiTool(r *reg.Registry, cfg config.Config) {
+func registerCollectMultiTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 
 	type collectMultiArgs struct {
 		Assets      []string       `json:"assets" jsonschema:"asset names or addresses to sweep"`
@@ -211,7 +219,10 @@ func registerCollectMultiTool(r *reg.Registry, cfg config.Config) {
 			Checks:      checkList(args.Checks),
 			Concurrency: jms.OptInt32(int32(concurrency)),
 		}
-		riskClass, would, blocked := rehearsal(class, args.Confirm)
+		// The sweep is judged at the call level, so its memory key is the
+		// call's own identity: the joined asset list plus the joined check
+		// commands. A remembered approval covers exactly this sweep again.
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), strings.Join(checkCommands(args.Checks), "\n"), class, args.Confirm)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, len(args.Checks), concurrency, effectiveTimeout(args.Timeout))
@@ -277,6 +288,11 @@ func registerCollectMultiTool(r *reg.Registry, cfg config.Config) {
 			note = fmt.Sprintf(
 				"one recorded bastion session per host; %d host(s) have no row at all, "+
 					"so nothing is known about them", missing)
+		}
+		// Why the gate let a dangerous sweep through: it rides in the
+		// call-level note, next to the sweep's own account.
+		if approvalNote != "" {
+			note = fmt.Sprintf("%s; %s", note, approvalNote)
 		}
 		if s := sweepSummary(okCount, failCount, firstFailure); s != "" {
 			res.Error = jms.Opt(s)

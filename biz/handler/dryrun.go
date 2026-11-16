@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 	"github.com/yi-nology/jumpserver-exec/internal/repository/koko"
@@ -18,26 +19,66 @@ import (
 // question to ask first — and the answer is the same one the confirmation
 // gate would give, so a dry run is a rehearsal of the real call.
 
-// rehearsal computes the three things every rehearsal and every refusal
-// says the same way: what the command was classified as, whether it would
-// run, and — when it would not — what the caller has to do about it.
+// approvalMemory is the slice of the policy package's Memory that the
+// confirmation gates need.
 //
-// The judgement and its sentence come from risk.Rehearsal, the ONE place
-// the "would this run?" question is answered for both planes: a tool that
-// answered it differently from its neighbour would be worse than no answer
-// at all, and the two planes used to spell the sentence each for itself.
-// This wrapper only adds the class name, which the answer shapes carry
-// alongside.
-func rehearsal(class jms.CommandClass, confirm bool) (riskClass string, would bool, blocked string) {
-	would, blocked = risk.Rehearsal(class, confirm)
-	return class.String(), would, blocked
+// It is an interface, not *policy.Memory, so this package does not import
+// internal/service/policy: that package's own tests register these
+// handlers, and a handler→policy import edge would make an import cycle in
+// the policy test binary. *policy.Memory satisfies it; nil means "no
+// memory" and every gate degrades to the plain risk verdict.
+type approvalMemory interface {
+	Enabled() bool
+	TTL() time.Duration
+	Grant(asset, command string)
+	Satisfied(asset, command string) (bool, time.Time)
+}
+
+// rehearsalM is the confirmation gate with the kael-style approval memory:
+// confirm=true grants, a live remembered approval satisfies, everything else
+// falls through to the shared risk verdict. The note it returns goes into
+// the answer's note field, so the trail shows WHY a dangerous command ran.
+//
+// The memory key is the EXACT command on the EXACT asset: an approval is
+// reused only for the identical call, never widened to "similar" commands —
+// widening is how a remembered rm -rf /tmp/x becomes a licence for
+// rm -rf /var. And the memory only ever RELAXES the confirmation gate,
+// never the read-only mode: the registration functions pass nil in
+// read-only mode (the gate's whitelist currently lets conditional write
+// tools reach the handler there), so under JMS_READ_ONLY=1 this degrades
+// to the plain risk verdict.
+func rehearsalM(mem approvalMemory, asset, command string, class jms.CommandClass, confirm bool) (riskClass string, would bool, blocked string, note string) {
+	riskClass = class.String()
+	if !risk.RequiresConfirmation(class) {
+		return riskClass, true, "", ""
+	}
+	if confirm {
+		if mem != nil && mem.Enabled() {
+			mem.Grant(asset, command)
+		}
+		if mem != nil && mem.Enabled() {
+			note = fmt.Sprintf("dangerous command confirmed and remembered; this exact command on this asset needs no further confirmation for %s", mem.TTL())
+		}
+		return riskClass, true, "", note
+	}
+	if mem != nil && mem.Enabled() {
+		if ok, at := mem.Satisfied(asset, command); ok {
+			return riskClass, true, "", fmt.Sprintf("confirmed via remembered approval granted at %s (expires %s)",
+				at.Format(time.RFC3339), at.Add(mem.TTL()).Format(time.RFC3339))
+		}
+	}
+	_, blocked = risk.Rehearsal(class, confirm)
+	return riskClass, false, blocked, ""
 }
 
 // dryRunCommand is the dry-run answer of a single command.
-func dryRunCommand(asset, command string, class jms.CommandClass, confirm bool) *jmsexec.CommandResult {
+func dryRunCommand(mem approvalMemory, asset, command string, class jms.CommandClass, confirm bool) *jmsexec.CommandResult {
 	// It would run if it needs no confirmation — or if the confirmation is
-	// already there.
-	riskClass, would, blocked := rehearsal(class, confirm)
+	// already there, given live or remembered.
+	riskClass, would, blocked, note := rehearsalM(mem, asset, command, class, confirm)
+	if note == "" {
+		note = render.RehearsalNote
+	}
 	res := &jmsexec.CommandResult{
 		Asset:    asset,
 		Command:  command,
@@ -47,7 +88,7 @@ func dryRunCommand(asset, command string, class jms.CommandClass, confirm bool) 
 	// The verdict vocabulary (risk / dry_run / would_execute / blocked /
 	// note) is filled by the shared writer, so the two planes cannot
 	// drift in what a rehearsal says.
-	render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
+	render.FillRehearsal(res, riskClass, would, blocked, note)
 	return res
 }
 

@@ -180,7 +180,7 @@ func TestARefusedCommandIsRecordedAsARefusal(t *testing.T) {
 				got = append(got, r)
 			},
 		},
-		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t), nil) })
 
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 		Name: "jmsx_exec",
@@ -289,7 +289,7 @@ func TestARehearsalIsNotRecordedAsARefusal(t *testing.T) {
 				got = append(got, r)
 			},
 		},
-		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t), nil) })
 
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 		Name: "jmsx_exec",

@@ -8,6 +8,7 @@ package router
 import (
 	"github.com/yi-nology/jumpserver-exec/biz/handler"
 	"github.com/yi-nology/jumpserver-exec/internal/config"
+	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
 	"github.com/yi-nology/jumpserver-kit/pkg/jmsapi"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
 )
@@ -16,12 +17,18 @@ import (
 //
 // The REST client may be nil: the inventory tool needs it and the command
 // tools do not, so a missing token disables one tool instead of the server.
+//
+// The approval memory is built HERE, once, from the configuration, and
+// shared by every conditional-confirmation gate: a confirm=true granted on
+// one tool is remembered for the identical call on the others' keys too —
+// and the TTL (0 = off) is the one configured value, not a per-tool choice.
 func Register(r *reg.Registry, cfg config.Config, c *jmsapi.Client) {
-	handler.RegisterExecTools(r, cfg)
+	mem := policy.NewMemory(cfg.ApprovalMemoryTTL)
+	handler.RegisterExecTools(r, cfg, mem)
 	if c != nil {
 		handler.RegisterInventoryTools(r, c)
 	}
-	handler.RegisterTransferTools(r, cfg)
+	handler.RegisterTransferTools(r, cfg, mem)
 	// The trail tool needs nothing from the bastion: it reads this
 	// machine's own files, so it works even when the REST client is
 	// missing.

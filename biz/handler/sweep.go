@@ -184,7 +184,7 @@ func sweepSummary(ok, failed int, firstFailure string) string {
 	return fmt.Sprintf("%d of %d hosts failed: %s", failed, ok+failed, firstFailure)
 }
 
-func registerExecMultiTool(r *reg.Registry, cfg config.Config) {
+func registerExecMultiTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 
 	type multiArgs struct {
 		Assets      []string `json:"assets" jsonschema:"asset names or addresses to run the command on"`
@@ -216,7 +216,11 @@ func registerExecMultiTool(r *reg.Registry, cfg config.Config) {
 			Command:     jms.Opt(args.Command),
 			Concurrency: jms.OptInt32(int32(concurrency)),
 		}
-		riskClass, would, blocked := rehearsal(cmdClass, args.Confirm)
+		// The sweep is judged at the call level, so its memory key is the
+		// call's own identity: the joined asset list plus the command. A
+		// remembered approval therefore covers exactly this sweep again —
+		// same hosts, same command — and nothing wider.
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, strings.Join(args.Assets, "\n"), args.Command, cmdClass, args.Confirm)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			res.Plan = planSweep(ctx, cfg, args.Assets, 1, concurrency, effectiveTimeout(args.Timeout))
@@ -329,6 +333,11 @@ func registerExecMultiTool(r *reg.Registry, cfg config.Config) {
 		if notAttempted > 0 {
 			note = fmt.Sprintf("%s; %d host(s) were never attempted, so nothing "+
 				"is known about them", note, notAttempted)
+		}
+		// Why the gate let a dangerous sweep through: it rides in the
+		// call-level note, next to the sweep's own account.
+		if approvalNote != "" {
+			note = fmt.Sprintf("%s; %s", note, approvalNote)
 		}
 		res.Note = jms.Opt(note)
 		return render.Text(res)

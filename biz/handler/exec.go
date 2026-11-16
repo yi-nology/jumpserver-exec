@@ -19,7 +19,21 @@ import (
 
 // The command tools: run a command on a managed machine through the
 // bastion, and check whether the bastion can open a shell on it at all.
-func RegisterExecTools(r *reg.Registry, cfg config.Config) {
+func RegisterExecTools(r *reg.Registry, cfg config.Config, mem approvalMemory) {
+	// ⚠️ The approval memory relaxes ONLY the confirmation gate, never the
+	// read-only mode. The read-only refusal belongs to the registry gate,
+	// which runs before any handler — but the gate's whitelist currently
+	// short-circuits the read-only intercept for conditional-confirmation
+	// tools (measured 2026-11-17: the capability stage answers
+	// "白名单放行" for a registered write tool in read-only mode), so the
+	// call can reach this body. If it does, a live remembered approval
+	// must not be the thing that lets a dangerous command run. The memory
+	// is therefore inert in read-only mode: the plain risk verdict
+	// stands, exactly as with no memory at all. (When the kit gate fixes
+	// the short-circuit, this backstop becomes unreachable and can go.)
+	if cfg.ReadOnly {
+		mem = nil
+	}
 	type execArgs struct {
 		Asset   string `json:"asset" jsonschema:"asset name, address or partial name as shown in JumpServer, e.g. node-071 or 192.0.2.71"`
 		Command string `json:"command" jsonschema:"shell command to run on the asset; runs as the asset account, NOT root -- use sudo -n yourself if root is needed"`
@@ -44,12 +58,16 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 		// rule the management plane's jms_job_run applies.
 		cmdClass := risk.Classify(args.Command)
 		if args.DryRun {
-			return render.Text(dryRunCommand(args.Asset, args.Command, cmdClass, args.Confirm))
+			return render.Text(dryRunCommand(mem, args.Asset, args.Command, cmdClass, args.Confirm))
 		}
 		// The gate reads the SAME judgement the rehearsal above would report —
 		// `would` is false exactly when the command needs a confirmation and
-		// none was given.
-		if riskClass, would, blocked := rehearsal(cmdClass, args.Confirm); !would {
+		// none was given. The approval memory is consulted here too: a
+		// confirm=true granted earlier satisfies the gate for the identical
+		// command on the identical asset, and the note it returns rides into
+		// the answer so the trail shows why a dangerous command ran.
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm)
+		if !would {
 			return render.Text(blockedCommand(args.Asset, args.Command, riskClass, blocked))
 		}
 		// The 600s ceiling (and the overflow it used to miss) lives in
@@ -91,6 +109,12 @@ func RegisterExecTools(r *reg.Registry, cfg config.Config) {
 			ExitCode: int32(code),
 			Output:   out,
 			Via:      k.Describe(),
+		}
+		// Why the gate let a dangerous command through: either it was
+		// confirmed live (and remembered) or it matched a remembered
+		// approval. The trail reads this.
+		if note != "" {
+			res.Note = jms.Opt(note)
 		}
 		// Which account the command ran as. An asset can carry several, and
 		// the session picks one, so the answer says which.

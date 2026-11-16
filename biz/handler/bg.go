@@ -26,7 +26,7 @@ import (
 // session (it survives the bastion closing the connection), and check
 // whether it has finished.
 
-func registerBgStartTool(r *reg.Registry, cfg config.Config) {
+func registerBgStartTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 
 	type bgStartArgs struct {
 		Asset   string `json:"asset" jsonschema:"asset name or address"`
@@ -50,7 +50,7 @@ func registerBgStartTool(r *reg.Registry, cfg config.Config) {
 			Asset:   jms.Opt(args.Asset),
 			Command: jms.Opt(args.Command),
 		}
-		riskClass, would, blocked := rehearsal(cmdClass, args.Confirm)
+		riskClass, would, blocked, approvalNote := rehearsalM(mem, args.Asset, args.Command, cmdClass, args.Confirm)
 		if !would {
 			render.FillRefusal(res, riskClass, blocked)
 			return render.Text(res)
@@ -96,6 +96,11 @@ func registerBgStartTool(r *reg.Registry, cfg config.Config) {
 		res.Status = jms.Opt(strings.TrimSpace(out))
 		res.Next = jms.Opt("poll with jmsx_bg_check, read the output with jmsx_get_file")
 		res.Note = jms.Opt("the process is detached, so the bastion session closing does not stop it")
+		// Why the gate let a dangerous command through: appended to the
+		// note so the trail sees both facts in one place.
+		if approvalNote != "" {
+			res.Note = jms.Opt(res.GetNote() + "; " + approvalNote)
+		}
 		return render.Text(res)
 	})
 

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -24,8 +25,8 @@ func TestEveryRegisteredToolIsClassified(t *testing.T) {
 	r := reg.New(&mcp.Implementation{Name: "exec-policy-test", Version: "1"},
 		reg.Options{Policy: Table})
 	c := mustLoad(t).APIClient()
-	handler.RegisterExecTools(r, mustLoad(t))
-	handler.RegisterTransferTools(r, mustLoad(t))
+	handler.RegisterExecTools(r, mustLoad(t), nil)
+	handler.RegisterTransferTools(r, mustLoad(t), nil)
 	handler.RegisterAuditTools(r, mustLoad(t).Audit)
 	if c != nil {
 		handler.RegisterInventoryTools(r, c)
@@ -51,8 +52,8 @@ func TestEveryToolDeclaresItsOutputShape(t *testing.T) {
 	r := reg.New(&mcp.Implementation{Name: "exec-policy-test", Version: "1"},
 		reg.Options{Policy: Table})
 	c := mustLoad(t).APIClient()
-	handler.RegisterExecTools(r, mustLoad(t))
-	handler.RegisterTransferTools(r, mustLoad(t))
+	handler.RegisterExecTools(r, mustLoad(t), nil)
+	handler.RegisterTransferTools(r, mustLoad(t), nil)
 	handler.RegisterAuditTools(r, mustLoad(t).Audit)
 	if c != nil {
 		handler.RegisterInventoryTools(r, c)
@@ -68,8 +69,8 @@ func TestEveryClassifiedToolIsRegistered(t *testing.T) {
 	r := reg.New(&mcp.Implementation{Name: "exec-policy-test", Version: "1"},
 		reg.Options{Policy: Table})
 	c := mustLoad(t).APIClient()
-	handler.RegisterExecTools(r, mustLoad(t))
-	handler.RegisterTransferTools(r, mustLoad(t))
+	handler.RegisterExecTools(r, mustLoad(t), nil)
+	handler.RegisterTransferTools(r, mustLoad(t), nil)
 	handler.RegisterAuditTools(r, mustLoad(t).Audit)
 	if c != nil {
 		handler.RegisterInventoryTools(r, c)
@@ -125,8 +126,8 @@ func TestToolCount(t *testing.T) {
 	r := reg.New(&mcp.Implementation{Name: "exec-policy-test", Version: "1"},
 		reg.Options{Policy: Table})
 	c := mustLoad(t).APIClient()
-	handler.RegisterExecTools(r, mustLoad(t))
-	handler.RegisterTransferTools(r, mustLoad(t))
+	handler.RegisterExecTools(r, mustLoad(t), nil)
+	handler.RegisterTransferTools(r, mustLoad(t), nil)
 	handler.RegisterAuditTools(r, mustLoad(t).Audit)
 	if c != nil {
 		handler.RegisterInventoryTools(r, c)
@@ -175,7 +176,7 @@ func TestToolCount(t *testing.T) {
 func TestReadOnlyModeRefusesWrites(t *testing.T) {
 	cs := testsupport.NewSession(t, "exec-readonly-test",
 		reg.Options{Policy: Table, ReadOnly: true},
-		func(r *reg.Registry) { handler.RegisterExecTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { handler.RegisterExecTools(r, mustLoad(t), nil) })
 
 	// The confirmation is there, and the call is still refused: the mode
 	// comes first.
@@ -188,6 +189,57 @@ func TestReadOnlyModeRefusesWrites(t *testing.T) {
 	}
 	if !res.IsError {
 		t.Fatal("the read-only mode let a write through")
+	}
+}
+
+// A remembered approval relaxes ONLY the confirmation gate, never the
+// read-only mode. The read-only refusal belongs to the registry gate,
+// which runs before the tool body — but the gate's whitelist currently
+// short-circuits the read-only intercept for conditional-confirmation
+// tools, so the call can reach the handler. The handlers therefore keep
+// the memory inert under JMS_READ_ONLY=1: this test pins that the
+// remembered approval does NOT satisfy the gate in read-only mode, and
+// its control half shows the same grant satisfying the gate in a normal
+// session.
+func TestApprovalMemoryDoesNotBypassReadOnlyMode(t *testing.T) {
+	mem := NewMemory(10 * time.Minute)
+	mem.Grant("10.0.0.1", "rm -rf /var/lib/x")
+
+	// ⚠️ The session's ReadOnly option and the handler's cfg.ReadOnly are
+	// wired from ONE configuration in the real server (router.New); a
+	// test wires them apart, so the environment has to say read-only too
+	// for the handler to see the mode the gate was given.
+	t.Setenv("JMS_READ_ONLY", "true")
+	cs := testsupport.NewSession(t, "exec-readonly-memory-test",
+		reg.Options{Policy: Table, ReadOnly: true},
+		func(r *reg.Registry) { handler.RegisterExecTools(r, mustLoad(t), mem) })
+	out := testsupport.CallToolJSON(t, cs, "jmsx_exec", map[string]any{
+		"asset": "10.0.0.1", "command": "rm -rf /var/lib/x", "dry_run": true,
+	})
+	if out["would_execute"] == true {
+		t.Fatalf("the remembered approval satisfied the gate in read-only mode: %v", out)
+	}
+	if blocked, _ := out["blocked"].(string); !strings.Contains(blocked, "confirm=true") {
+		t.Errorf("the refusal does not demand the confirmation: %v", out)
+	}
+	if note, _ := out["note"].(string); strings.Contains(note, "remembered approval") {
+		t.Errorf("the note credits the memory in read-only mode: %q", note)
+	}
+
+	// The control: same grant, normal mode — the memory satisfies the
+	// confirmation gate, and the rehearsal says so in its note.
+	t.Setenv("JMS_READ_ONLY", "")
+	cs = testsupport.NewSession(t, "exec-memory-control-test",
+		reg.Options{Policy: Table},
+		func(r *reg.Registry) { handler.RegisterExecTools(r, mustLoad(t), mem) })
+	out = testsupport.CallToolJSON(t, cs, "jmsx_exec", map[string]any{
+		"asset": "10.0.0.1", "command": "rm -rf /var/lib/x", "dry_run": true,
+	})
+	if out["would_execute"] != true {
+		t.Errorf("the remembered approval did not satisfy the gate in normal mode: %v", out)
+	}
+	if note, _ := out["note"].(string); !strings.Contains(note, "remembered approval") {
+		t.Errorf("the rehearsal does not name the remembered approval: %#v", out)
 	}
 }
 

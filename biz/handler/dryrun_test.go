@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/yi-nology/jumpserver-exec/biz/model/jmsexec"
 	"github.com/yi-nology/jumpserver-exec/internal/service/policy"
 	"github.com/yi-nology/jumpserver-kit/model/jms"
 	"github.com/yi-nology/jumpserver-kit/pkg/reg"
+	"github.com/yi-nology/jumpserver-kit/pkg/risk"
 	"github.com/yi-nology/jumpserver-kit/pkg/testsupport"
 )
 
@@ -22,7 +24,7 @@ import (
 // the session is opened.
 func TestDryRunAnswersWithoutRunning(t *testing.T) {
 	cs := testsupport.NewSession(t, "dryrun-test", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterExecTools(r, mustLoad(t), nil) })
 
 	cases := []struct {
 		name         string
@@ -75,10 +77,50 @@ func TestDryRunAnswersWithoutRunning(t *testing.T) {
 	}
 }
 
+// The confirmation gate with the approval memory: a readonly command never
+// asks and never notes; a dangerous one is blocked without confirm unless a
+// live remembered approval covers this EXACT command on this EXACT asset;
+// confirm=true grants such an approval and says so in the note.
+func TestRehearsalM(t *testing.T) {
+	mem := policy.NewMemory(10 * time.Minute)
+	dangerous := risk.Classify("rm -rf /tmp/x")
+	ro := risk.Classify("ls /tmp")
+	// 只读命令从不确认、不记笔记
+	if rc, would, blocked, note := rehearsalM(mem, "a", "ls /tmp", ro, false); !would || blocked != "" || note != "" {
+		t.Fatalf("readonly: would=%v blocked=%q note=%q", would, blocked, note)
+	} else if rc != ro.String() {
+		t.Fatalf("readonly: riskClass = %q, want %q", rc, ro.String())
+	}
+	// 危险无 confirm 无记忆 ⇒ 拦
+	if _, would, blocked, _ := rehearsalM(nil, "a", "rm -rf /tmp/x", dangerous, false); would || blocked == "" {
+		t.Fatal("dangerous without confirm must be blocked when no memory")
+	}
+	// confirm=true ⇒ 放行 + 记笔记 + 授予
+	_, would, _, note := rehearsalM(mem, "a", "rm -rf /tmp/x", dangerous, true)
+	if !would || !strings.Contains(note, "remembered") {
+		t.Fatalf("grant note missing: would=%v note=%q", would, note)
+	}
+	// 同命令同资产无 confirm ⇒ 记忆放行 + 笔记写明来源
+	_, would, blocked, note := rehearsalM(mem, "a", "rm -rf /tmp/x", dangerous, false)
+	if !would || blocked != "" || !strings.Contains(note, "remembered approval") {
+		t.Fatalf("memory hit failed: would=%v blocked=%q note=%q", would, blocked, note)
+	}
+	// 别的资产不命中
+	if _, would, _, _ := rehearsalM(mem, "b", "rm -rf /tmp/x", dangerous, false); would {
+		t.Fatal("memory leaked across assets")
+	}
+	// 记忆关闭（TTL=0）⇒ 就算先前授予过也不放行
+	off := policy.NewMemory(0)
+	off.Grant("a", "rm -rf /tmp/x")
+	if _, would, blocked, _ := rehearsalM(off, "a", "rm -rf /tmp/x", dangerous, false); would || blocked == "" {
+		t.Fatal("a disabled memory must not satisfy the gate")
+	}
+}
+
 // The contract carries the dry-run fields, so the shape of the answer is
 // owned by the IDL rather than assembled per call.
 func TestCommandResultCarriesTheDryRunFields(t *testing.T) {
-	res := dryRunCommand("10.0.0.1", "uptime", jms.CommandClass_READ, false)
+	res := dryRunCommand(nil, "10.0.0.1", "uptime", jms.CommandClass_READ, false)
 	if res.GetDryRun() != true {
 		t.Error("dry_run is not set")
 	}
@@ -111,7 +153,7 @@ func TestCommandResultCarriesTheDryRunFields(t *testing.T) {
 // admits that the tool may write; the rehearsal itself writes nothing.
 func TestPutDirDryRunAnswersFromTheLocalPrescan(t *testing.T) {
 	cs := testsupport.NewSession(t, "dryrun-putdir", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t), nil) })
 
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
@@ -160,7 +202,7 @@ func TestPutDirDryRunAnswersFromTheLocalPrescan(t *testing.T) {
 // not walk either.
 func TestPutDirDryRunRefusesANonDirectory(t *testing.T) {
 	cs := testsupport.NewSession(t, "dryrun-putdir-bad", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t), nil) })
 	dir := t.TempDir()
 	file := filepath.Join(dir, "f.txt")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {

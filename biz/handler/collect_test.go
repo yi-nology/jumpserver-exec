@@ -23,7 +23,7 @@ import (
 func TestCollectWithADangerousCommandIsBlocked(t *testing.T) {
 	// No bastion is needed: the refusal happens before a session is opened.
 	cs := testsupport.NewSession(t, "collect-test", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t), nil) })
 
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 		Name: "jmsx_collect",

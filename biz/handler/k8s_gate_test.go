@@ -42,7 +42,7 @@ func k8sBastionConfig(t *testing.T) config.Config {
 func TestReachableReportsK8sAssetsAsUnshellable(t *testing.T) {
 	cfg := k8sBastionConfig(t)
 	cs := testsupport.NewSession(t, "k8s-reachable", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterExecTools(r, cfg); RegisterTransferTools(r, cfg) })
+		func(r *reg.Registry) { RegisterExecTools(r, cfg, nil); RegisterTransferTools(r, cfg, nil) })
 
 	out := testsupport.CallToolJSON(t, cs, "jmsx_reachable", map[string]any{"asset": "studio-prod"})
 	if reachable, _ := out["reachable"].(bool); reachable {
@@ -64,7 +64,7 @@ func TestReachableReportsK8sAssetsAsUnshellable(t *testing.T) {
 func TestExecRefusesK8sAssetsWithTheJumpHostGuidance(t *testing.T) {
 	cfg := k8sBastionConfig(t)
 	cs := testsupport.NewSession(t, "k8s-exec", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterExecTools(r, cfg); RegisterTransferTools(r, cfg) })
+		func(r *reg.Registry) { RegisterExecTools(r, cfg, nil); RegisterTransferTools(r, cfg, nil) })
 
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "jmsx_exec",
@@ -90,7 +90,7 @@ func TestExecRefusesK8sAssetsWithTheJumpHostGuidance(t *testing.T) {
 func TestCollectMultiRowsCarryTheRefusalPerHost(t *testing.T) {
 	cfg := k8sBastionConfig(t)
 	cs := testsupport.NewSession(t, "k8s-collect", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterExecTools(r, cfg); RegisterTransferTools(r, cfg) })
+		func(r *reg.Registry) { RegisterExecTools(r, cfg, nil); RegisterTransferTools(r, cfg, nil) })
 
 	out := testsupport.CallToolJSON(t, cs, "jmsx_collect_multi", map[string]any{
 		"assets": []string{"studio-prod", "node-031"},

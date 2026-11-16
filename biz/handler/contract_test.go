@@ -22,8 +22,8 @@ import (
 func TestNoToolFallsBackToTheVagueShape(t *testing.T) {
 	cs := testsupport.NewSession(t, "shape-test", reg.Options{Policy: policy.Table},
 		func(r *reg.Registry) {
-			RegisterExecTools(r, mustLoad(t))
-			RegisterTransferTools(r, mustLoad(t))
+			RegisterExecTools(r, mustLoad(t), nil)
+			RegisterTransferTools(r, mustLoad(t), nil)
 			if c := mustLoad(t).APIClient(); c != nil {
 				RegisterInventoryTools(r, c)
 			}

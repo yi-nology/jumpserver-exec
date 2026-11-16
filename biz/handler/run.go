@@ -5,6 +5,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -20,7 +21,7 @@ import (
 // jmsx_run: several commands on one machine over one session —
 // the per-machine counterpart of jmsx_exec.
 
-func registerRunTool(r *reg.Registry, cfg config.Config) {
+func registerRunTool(r *reg.Registry, cfg config.Config, mem approvalMemory) {
 
 	type runArgs struct {
 		Asset    string   `json:"asset" jsonschema:"asset name or address, e.g. node-071"`
@@ -56,7 +57,10 @@ func registerRunTool(r *reg.Registry, cfg config.Config) {
 			Asset:    args.Asset,
 			Commands: args.Commands,
 		}
-		riskClass, would, blocked := rehearsal(cmdClass, args.Confirm)
+		// The batch is one approval unit: the joined command list is the
+		// memory key, so a remembered approval covers exactly this batch
+		// on this asset — nothing wider.
+		riskClass, would, blocked, note := rehearsalM(mem, args.Asset, strings.Join(args.Commands, "\n"), cmdClass, args.Confirm)
 		if args.DryRun {
 			render.FillRehearsal(res, riskClass, would, blocked, render.RehearsalNote)
 			return render.Text(res)
@@ -77,6 +81,11 @@ func registerRunTool(r *reg.Registry, cfg config.Config) {
 		results, runErr := s.Exec(args.Commands, timeout)
 		res.Results = results
 		res.Stats = s.Stats()
+		// Why the gate let a dangerous batch through (live confirm granted /
+		// remembered approval). The trail reads this.
+		if note != "" {
+			res.Note = jms.Opt(note)
+		}
 		if runErr != nil {
 			res.Partial = jms.OptBool(true)
 			// How far the commands got. The trail asks "what may still be

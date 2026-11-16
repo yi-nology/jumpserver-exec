@@ -310,7 +310,7 @@ func planFromWire(t *testing.T, out map[string]any) *jmsexec.SweepPlan {
 func callTool(t *testing.T, name string, args map[string]any) map[string]any {
 	t.Helper()
 	cs := testsupport.NewSession(t, "plan-test", reg.Options{Policy: policy.Table},
-		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t)) })
+		func(r *reg.Registry) { RegisterTransferTools(r, mustLoad(t), nil) })
 	return testsupport.CallToolJSON(t, cs, name, args)
 }
 
