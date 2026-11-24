@@ -16,7 +16,7 @@ require (
 	github.com/oekit/concurrency v0.38.1
 	github.com/oekit/logx v0.11.0
 	github.com/oekit/network v0.11.2
-	github.com/oekit/pkg v0.52.0
+	github.com/oekit/pkg v0.61.1
 	github.com/yi-nology/jumpserver-kit v0.13.0
 	golang.org/x/crypto v0.59.0
 )
