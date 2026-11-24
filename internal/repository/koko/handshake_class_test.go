@@ -8,7 +8,7 @@ import (
 // 重试分类必须是「类型」判断（network#116 收编）：默认 Retryable 只认握手
 // 超时哨兵；认证拒绝是判定不是抖动，必须漏网。dialPolicyOf 把 Retryable 留
 // nil 就是在守这条——上游默认只重拨 ErrHandshakeTimeout，措辞匹配的旧教训
-//（拒绝文案里也有 "handshake"，曾把拒绝当抖动静默重拨）在 sshx 侧有测试钉。
+// （拒绝文案里也有 "handshake"，曾把拒绝当抖动静默重拨）在 sshx 侧有测试钉。
 func TestDialPolicyRetriesOnlyHandshakeTimeouts(t *testing.T) {
 	p := dialPolicyOf(Config{DialRetries: 1}) // 1 是 confload 的默认值（JMS_KOKO_DIAL_RETRIES）
 	if p.Retryable != nil {
