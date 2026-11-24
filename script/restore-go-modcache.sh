@@ -104,7 +104,7 @@ MODULES=(
   "github.com/oekit/logx/kitexlog@v0.1.12"
   "github.com/oekit/metrics@v0.4.1"
   "github.com/oekit/network@v0.11.2"
-  "github.com/oekit/pkg@v0.52.0"
+  "github.com/oekit/pkg@v0.61.1"
   "github.com/opentracing/opentracing-go@v1.2.1-0.20220228012449-10b1cf09e00b"
   "github.com/orcaman/concurrent-map@v1.0.0"
   "github.com/pandatix/go-abnf@v0.5.5"

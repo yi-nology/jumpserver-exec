@@ -19,17 +19,14 @@ package koko
 // trips a caller is willing to pay for.
 
 import (
-	"archive/tar"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -40,6 +37,7 @@ import (
 	"github.com/oekit/pkg/pathx"
 	"github.com/oekit/pkg/shellx"
 	"github.com/oekit/pkg/stringx"
+	"github.com/oekit/pkg/tarx"
 )
 
 const (
@@ -322,11 +320,10 @@ type DirStats struct {
 // at zero bastion cost, so the agent can shard a too-large tree, clean the
 // skipped entries, or catch a wrong path BEFORE any session exists.
 //
-// ⚠️ The counts are pinned to writeDirTar's (the test walks both over the
+// ⚠️ The counts are pinned to the stream's (the test walks both over the
 // same fixture): a prescan that drifted from the stream would rehearse an
-// upload that never happens. The walk mirrors it branch for branch —
-// directories are structure, symlinks ride as symlinks, regular files count
-// with their content size, everything else is skipped and named.
+// upload that never happens. 口径一致性由 pkg/tarx 保证——预扫与流式写出
+// 共用同一棵分类树与同一份实现（tarx 侧的 Scan↔Write 奇偶测试随包钉住）。
 func PrescanDir(root string) (*DirStats, error) {
 	info, err := os.Stat(root)
 	if err != nil {
@@ -335,45 +332,18 @@ func PrescanDir(root string) (*DirStats, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", root)
 	}
-	st := &DirStats{}
-	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if p == root {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		switch {
-		case d.IsDir():
-			return nil
-		case info.Mode()&fs.ModeSymlink != 0:
-			return nil
-		case info.Mode().IsRegular():
-			st.Files++
-			st.Bytes += info.Size()
-			return nil
-		default:
-			// Sockets and devices cannot travel a tar stream — the same
-			// skip writeDirTar makes, counted the same way.
-			st.Skipped++
-			if len(st.SkippedNames) < 3 {
-				rel, rerr := filepath.Rel(root, p)
-				if rerr != nil {
-					rel = p
-				}
-				st.SkippedNames = append(st.SkippedNames, filepath.ToSlash(rel))
-			}
-			return nil
-		}
-	})
+	// 预扫口径与流式写出器同源（tarx.Scan 与 tarx.Write 共用分类树）——
+	// 链接语义开启时链接也计入（与写侧一致），否则算「流会丢下的」。
+	st, err := tarx.Scan(root, tarx.WithScanSymlinks())
 	if err != nil {
 		return nil, err
 	}
-	return st, nil
+	return &DirStats{
+		Files:        st.Files,
+		Bytes:        st.Bytes,
+		Skipped:      st.Skipped,
+		SkippedNames: st.SkippedNames,
+	}, nil
 }
 
 // GetDir downloads a directory from the asset as one tar stream on the exec
@@ -559,77 +529,22 @@ func remoteTreeKB(runLocked func(string, time.Duration) (string, error), remoteD
 }
 
 // readDirTar extracts a tar stream into root as it arrives, counting what
-// it wrote and what it refused. An entry whose name is absolute or climbs
-// out of root is skipped (counted, named) — never followed.
+// it wrote and what it refused.
+//
+// 口径已下沉到 github.com/oekit/pkg/tarx（Extract）：本仓曾自搓一份同型实现
+// （含 safeExtractPath 的穿越判定），两处维护同一套判据的风险是「改一处
+// 忘另一处」——恶意条目在一边被拒、在另一边被放过。
+//
+// tarx 侧更强的两点：① 目标目录**既有 symlink** 也拒收（路径链任一段是
+// symlink ⇒ 归档内容会沿它写穿 root 之外）；② 链接目标逃逸 root 的判定
+// （开启链接语义时）。本仓原来的手搓实现只判条目名穿越，不判这两面。
 func readDirTar(r io.Reader, root string, counts *dirTarCounts) error {
-	tr := tar.NewReader(r)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		name := hdr.Name
-		if !safeExtractPath(root, name) {
-			counts.skipped++
-			if len(counts.skippedNames) < 3 {
-				counts.skippedNames = append(counts.skippedNames, name)
-			}
-			// Drain the body so the stream stays aligned.
-			_, _ = io.Copy(io.Discard, tr)
-			continue
-		}
-		dest := filepath.Join(root, filepath.FromSlash(name))
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(dest, 0o755); err != nil {
-				return err
-			}
-		case tar.TypeSymlink:
-			_ = os.MkdirAll(filepath.Dir(dest), 0o755)
-			_ = os.Remove(dest)
-			if err := os.Symlink(hdr.Linkname, dest); err != nil {
-				return err
-			}
-			counts.files++
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-				return err
-			}
-			f, err := os.OpenFile(dest, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(hdr.Mode)&0o777)
-			if err != nil {
-				return err
-			}
-			n, err := io.Copy(f, tr)
-			f.Close()
-			if err != nil {
-				return err
-			}
-			counts.files++
-			counts.bytes += n
-		default:
-			counts.skipped++
-			if len(counts.skippedNames) < 3 {
-				counts.skippedNames = append(counts.skippedNames, name)
-			}
-		}
-	}
-}
-
-// safeExtractPath refuses an archive entry that would write outside root:
-// absolute names and any climb through "..". Everything else is fine.
-func safeExtractPath(root, name string) bool {
-	if strings.HasPrefix(name, "/") || filepath.IsAbs(name) {
-		return false
-	}
-	clean := filepath.Clean(filepath.Join(root, filepath.FromSlash(name)))
-	rootClean, err := filepath.Abs(root)
-	if err != nil {
-		return false
-	}
-	return strings.HasPrefix(clean+string(os.PathSeparator), rootClean+string(os.PathSeparator)) || clean == rootClean
+	st, err := tarx.Extract(r, root, tarx.WithSymlinkExtract())
+	counts.files = st.Files
+	counts.bytes = st.Bytes
+	counts.skipped = st.Skipped
+	counts.skippedNames = st.SkippedNames
+	return err
 }
 
 // dirTarCounts is what the tar writer tallies while it walks: the numbers
@@ -656,76 +571,28 @@ type dirTarCounts struct {
 // everything else (sockets, devices) is skipped, not fatal — a deploy
 // directory with a stray socket in it still uploads.
 func writeDirTar(w io.Writer, root string, counts *dirTarCounts) error {
-	tw := tar.NewWriter(w)
-	// After the tree, the manifest itself goes on the stream as one more
-	// entry (jmsx_put_dir's arrival proof): the remote side checks it with
-	// sha256sum -c and deletes it. sha256sum 格式: "<hex>  <path>", two
-	// spaces, path exactly as archived.
-	defer tw.Close()
-	defer func() {
-		if len(counts.manifest) == 0 {
-			return
-		}
-		name := fmt.Sprintf(".jmsx-manifest-%d", time.Now().UnixNano())
-		body := strings.Join(counts.manifest, "\n") + "\n"
-		_ = tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o600, Size: int64(len(body)), ModTime: time.Now()})
-		_, _ = tw.Write([]byte(body))
-	}()
-	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
-			return nil
-		}
-		name := filepath.ToSlash(rel)
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		switch {
-		case d.IsDir():
-			return tw.WriteHeader(&tar.Header{Name: name + "/", Typeflag: tar.TypeDir, Mode: 0o755, ModTime: info.ModTime()})
-		case info.Mode()&fs.ModeSymlink != 0:
-			target, err := os.Readlink(p)
-			if err != nil {
-				return err
-			}
-			return tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeSymlink, Linkname: target, ModTime: info.ModTime()})
-		case info.Mode().IsRegular():
-			f, err := os.Open(p)
-			if err != nil {
-				return err
-			}
-			if err := tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: int64(info.Mode().Perm()), Size: info.Size(), ModTime: info.ModTime()}); err != nil {
-				f.Close()
-				return err
-			}
-			// The digest is computed WHILE the bytes stream (a TeeWriter
-			// around the tar entry) — a second read of the file would be a
-			// second truth, and a file changing between the two reads is
-			// exactly what a manifest must not hide.
-			h := sha256.New()
-			n, err := io.Copy(io.MultiWriter(tw, h), f)
-			f.Close()
-			counts.files++
-			counts.bytes += n
-			counts.manifest = append(counts.manifest, fmt.Sprintf("%x  %s", h.Sum(nil), name))
-			return err
-		default:
-			// Sockets and devices cannot travel a tar stream. Skip, but
-			// COUNT: "2 entries did not travel" is a fact the caller owns.
-			counts.skipped++
-			if len(counts.skippedNames) < 3 {
-				counts.skippedNames = append(counts.skippedNames, name)
-			}
-			return nil
-		}
-	})
+	// 写侧下沉到 github.com/oekit/pkg/tarx（Write）：本仓曾自搓一份同型实现
+	// （逐条 walk + 手工写 tar header + 手工算 sha256 清单），与收侧手搓件
+	// 同型维护两处 ⇒ 口径漂移的风险面。tarx 侧把「预扫与流式写出同源」做成
+	// 结构保证（共用 walkRel 与同一套分类分支，Scan↔Write 奇偶测试随包钉住）。
+	//
+	// 本仓保留的是**协议层**（tarx 不该知道的事）：
+	//   - 清单条目名用随机后缀（.jmsx-manifest-<纳秒>）——远端用
+	//     `ls -1t <dir>/.jmsx-manifest-*` 找它，固定名会与用户文件撞名；
+	//   - 清单文本格式（`<hex>  <path>`，两空格）——远端 `sha256sum -c` 直接
+	//     消费，tarx 的格式与此逐字相同。
+	manifestName := fmt.Sprintf(".jmsx-manifest-%d", time.Now().UnixNano())
+	st, err := tarx.Write(w, root,
+		tarx.WithSymlinks(),
+		tarx.WithManifest(),
+		tarx.WithManifestName(manifestName),
+	)
+	counts.files = st.Files
+	counts.bytes = st.Bytes
+	counts.skipped = st.Skipped
+	counts.skippedNames = st.SkippedNames
+	counts.manifest = st.ManifestLines
+	return err
 }
 
 func (s *Session) PutFile(localPath, remotePath string, timeout time.Duration) (*TransferResult, error) {
