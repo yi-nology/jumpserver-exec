@@ -16,7 +16,7 @@ require (
 	github.com/oekit/concurrency v0.38.1
 	github.com/oekit/logx v0.11.0
 	github.com/oekit/network v0.11.2
-	github.com/oekit/pkg v0.61.1
+	github.com/oekit/pkg v0.61.5
 	github.com/yi-nology/jumpserver-kit v0.13.0
 	golang.org/x/crypto v0.59.0
 )
@@ -79,7 +79,6 @@ require (
 	github.com/oekit/bootstrap v0.7.13 // indirect
 	github.com/oekit/core v0.15.4 // indirect
 	github.com/oekit/kitex v0.8.3 // indirect
-	github.com/oekit/logx/kitexlog v0.1.12 // indirect
 	github.com/oekit/metrics v0.4.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/orcaman/concurrent-map v1.0.0 // indirect
